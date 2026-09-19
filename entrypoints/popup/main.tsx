@@ -69,7 +69,7 @@ function probeInstagramPage(): PageProbeResult | null {
         score,
       };
     })
-    .filter((candidate): candidate is PageProbeResult & { score: number } => Boolean(candidate))
+    .filter((candidate) => candidate !== null)
     .sort((a, b) => b.score - a.score);
 
   const best = candidates[0];
