@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { diffSnapshots } from '../src/domain/relationship';
-import type { ExtensionState } from '../src/domain/types';
+import type { ExtensionState, SyncErrorCode } from '../src/domain/types';
 import { isInstagramUsername } from '../src/instagram/profile-identity';
 import type { WhoBackMessage } from '../src/lib/messages';
 import { getState, isSnapshotStale, patchState, setState } from '../src/lib/state';
@@ -49,7 +49,9 @@ async function sanitizePersistedAccount() {
 
 async function maybeAutoSync() {
   const state = await getState();
-  if (!state.settings.autoSync || !state.account || !isSnapshotStale(state) || isBusy(state)) return;
+  if (!state.settings.autoSync || !state.account || !isSnapshotStale(state) || isBusy(state)) {
+    return;
+  }
   await startSync(state.account.username);
 }
 
@@ -59,37 +61,80 @@ function isBusy(state: ExtensionState) {
 
 async function startSync(username?: string) {
   const state = await getState();
-  const owner = username ?? state.account?.username;
-
-  if (!owner || !isInstagramUsername(owner)) {
-    await setState({
-      ...state,
-      account: null,
-      sync: {
-        phase: 'error',
-        progress: 0,
-        message: 'Open or refresh instagram.com once so WhoBack can detect your account.',
-        finishedAt: Date.now(),
-      },
-    });
-    return;
-  }
+  const expectedUsername = username ?? state.account?.username;
 
   if (isBusy(state)) return;
 
-  const tab = await browser.tabs.create({
-    url: `https://www.instagram.com/${encodeURIComponent(owner)}/?whoback_sync=1&whoback_account=${encodeURIComponent(owner)}`,
-    active: false,
-  });
+  const tab = await findInstagramTab();
+  if (!tab?.id) {
+    await setSyncError(
+      'NO_INSTAGRAM_TAB',
+      'Open instagram.com in this browser, then run WhoBack again.',
+    );
+    return;
+  }
 
   await patchState({
     sync: {
       phase: 'starting',
-      progress: 3,
-      message: 'Connecting to Instagram…',
+      progress: 2,
+      message: 'Connecting to your Instagram session…',
       startedAt: Date.now(),
       tabId: tab.id,
     },
+  });
+
+  void dispatchSync(tab.id, expectedUsername);
+}
+
+async function findInstagramTab() {
+  const tabs = await browser.tabs.query({ url: ['https://www.instagram.com/*'] });
+  return [...tabs].sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)))[0];
+}
+
+async function dispatchSync(tabId: number, expectedUsername?: string) {
+  const message = {
+    type: 'RUN_SYNC',
+    expectedUsername,
+  } satisfies WhoBackMessage;
+
+  try {
+    await browser.tabs.sendMessage(tabId, message);
+    return;
+  } catch {
+    // A tab kept open across an extension reload can retain an invalidated content-script context.
+  }
+
+  try {
+    await browser.tabs.reload(tabId);
+    await waitForTabComplete(tabId, 15_000);
+    await browser.tabs.sendMessage(tabId, message);
+  } catch {
+    await setSyncError(
+      'CONTENT_SCRIPT_UNAVAILABLE',
+      'WhoBack could not attach to the Instagram tab. Refresh instagram.com and try again.',
+    );
+  }
+}
+
+async function waitForTabComplete(tabId: number, timeoutMs: number) {
+  const current = await browser.tabs.get(tabId);
+  if (current.status === 'complete') return;
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      browser.tabs.onUpdated.removeListener(listener);
+      reject(new Error('Instagram tab reload timed out.'));
+    }, timeoutMs);
+
+    const listener = (updatedTabId: number, info: { status?: string }) => {
+      if (updatedTabId !== tabId || info.status !== 'complete') return;
+      clearTimeout(timeout);
+      browser.tabs.onUpdated.removeListener(listener);
+      resolve();
+    };
+
+    browser.tabs.onUpdated.addListener(listener);
   });
 }
 
@@ -104,10 +149,15 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
       }
       return { ok: true };
     }
+
     case 'START_SYNC': {
       await startSync();
       return { ok: true };
     }
+
+    case 'RUN_SYNC':
+      return { ok: false };
+
     case 'SYNC_PROGRESS': {
       const state = await getState();
       await patchState({
@@ -116,10 +166,12 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
           phase: message.phase,
           progress: message.progress,
           message: message.message,
+          errorCode: undefined,
         },
       });
       return { ok: true };
     }
+
     case 'SYNC_COMPLETE': {
       const state = await getState();
       const snapshots = [...state.snapshots, message.snapshot].slice(-30);
@@ -129,6 +181,7 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
 
       await setState({
         ...state,
+        account: message.account ?? state.account,
         snapshots,
         sync: {
           phase: 'complete',
@@ -139,22 +192,14 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
       });
 
       await updateBadge(badgeCount, state.settings.showBadge);
-      await closeSyncTab(state.sync.tabId ?? senderTabId);
       return { ok: true };
     }
+
     case 'SYNC_ERROR': {
-      const state = await getState();
-      await patchState({
-        sync: {
-          phase: 'error',
-          progress: 0,
-          message: message.message,
-          finishedAt: Date.now(),
-        },
-      });
-      await closeSyncTab(state.sync.tabId ?? senderTabId);
+      await setSyncError(message.code, message.message);
       return { ok: false };
     }
+
     case 'OPEN_PANEL': {
       if (senderTabId && browser.sidePanel?.open) {
         await browser.sidePanel.open({ tabId: senderTabId });
@@ -164,6 +209,20 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
   }
 }
 
+async function setSyncError(code: SyncErrorCode, message: string) {
+  const state = await getState();
+  await patchState({
+    sync: {
+      ...state.sync,
+      phase: 'error',
+      progress: 0,
+      errorCode: code,
+      message,
+      finishedAt: Date.now(),
+    },
+  });
+}
+
 async function updateBadge(count: number, enabled: boolean) {
   await browser.action.setBadgeText({
     text: enabled && count > 0 ? String(Math.min(count, 99)) : '',
@@ -171,14 +230,5 @@ async function updateBadge(count: number, enabled: boolean) {
 
   if (enabled && count > 0) {
     await browser.action.setBadgeBackgroundColor({ color: '#e23943' });
-  }
-}
-
-async function closeSyncTab(tabId?: number) {
-  if (!tabId) return;
-  try {
-    await browser.tabs.remove(tabId);
-  } catch {
-    // The sync tab may already be closed by the user.
   }
 }
