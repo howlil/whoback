@@ -2,6 +2,7 @@ export type RelationshipView = 'not-back' | 'fans' | 'mutual';
 
 export interface InstagramAccount {
   username: string;
+  platformUserId?: string;
   avatarUrl?: string;
   detectedAt: number;
 }
@@ -27,12 +28,35 @@ export interface RelationshipChanges {
   youUnfollowed: string[];
 }
 
-export type SyncPhase = 'idle' | 'starting' | 'followers' | 'following' | 'processing' | 'complete' | 'error';
+export type SyncPhase =
+  | 'idle'
+  | 'starting'
+  | 'followers'
+  | 'following'
+  | 'processing'
+  | 'complete'
+  | 'error';
+
+export type SyncErrorCode =
+  | 'NO_INSTAGRAM_TAB'
+  | 'CONTENT_SCRIPT_UNAVAILABLE'
+  | 'SESSION_EXPIRED'
+  | 'ACCOUNT_RESOLVE_FAILED'
+  | 'REQUEST_BLOCKED'
+  | 'RATE_LIMITED'
+  | 'INSTAGRAM_UNAVAILABLE'
+  | 'RELATIONSHIP_REQUEST_FAILED'
+  | 'PAGINATION_STALLED'
+  | 'INVALID_RESPONSE'
+  | 'NETWORK_ERROR'
+  | 'SYNC_ABORTED'
+  | 'UNKNOWN';
 
 export interface SyncState {
   phase: SyncPhase;
   progress: number;
   message?: string;
+  errorCode?: SyncErrorCode;
   startedAt?: number;
   finishedAt?: number;
   tabId?: number;
