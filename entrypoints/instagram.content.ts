@@ -1,8 +1,11 @@
 import { browser } from 'wxt/browser';
-import { collectRelationshipList } from '../src/instagram/collector';
 import { detectCurrentAccount } from '../src/instagram/detect-account';
-import { isInstagramUsername } from '../src/instagram/profile-identity';
-import type { InstagramAccount } from '../src/domain/types';
+import {
+  InstagramRestSource,
+  InstagramSyncError,
+  type RelationshipProgress,
+} from '../src/instagram/rest-source';
+import type { InstagramAccount, SyncErrorCode } from '../src/domain/types';
 import type { WhoBackMessage } from '../src/lib/messages';
 
 export default defineContentScript({
@@ -11,99 +14,114 @@ export default defineContentScript({
   async main() {
     let lastUsername = '';
     let collecting = false;
+    const source = new InstagramRestSource();
 
-    const reportAccount = async () => {
-      const account = detectCurrentAccount();
+    const sendDetectedAccount = async (account: InstagramAccount | null) => {
       if (!account || account.username === lastUsername) return account;
       lastUsername = account.username;
-      await browser.runtime.sendMessage({ type: 'ACCOUNT_DETECTED', account } satisfies WhoBackMessage);
+      await browser.runtime.sendMessage({
+        type: 'ACCOUNT_DETECTED',
+        account,
+      } satisfies WhoBackMessage);
       return account;
     };
 
-    const syncIfRequested = async () => {
-      const url = new URL(location.href);
-      if (collecting || url.searchParams.get('whoback_sync') !== '1') return;
-
-      collecting = true;
+    const reportAccountFromSession = async () => {
       try {
-        const requestedOwner = url.searchParams.get('whoback_account');
-        const owner = requestedOwner && isInstagramUsername(requestedOwner)
-          ? requestedOwner
-          : (await waitForAccount(reportAccount)).username;
+        const account = await source.resolveSession();
+        return await sendDetectedAccount(account);
+      } catch {
+        return null;
+      }
+    };
 
+    const reportAccountFromDom = async () => {
+      return sendDetectedAccount(detectCurrentAccount());
+    };
+
+    const runSync = async () => {
+      if (collecting) return { ok: false, reason: 'busy' };
+      collecting = true;
+
+      try {
         await browser.runtime.sendMessage({
           type: 'SYNC_PROGRESS',
-          phase: 'followers',
-          progress: 8,
-          message: 'Loading followers…',
+          phase: 'starting',
+          progress: 4,
+          message: 'Using your Instagram session…',
         } satisfies WhoBackMessage);
 
-        const followers = await collectRelationshipList(owner, 'followers', (count) => {
-          void browser.runtime.sendMessage({
-            type: 'SYNC_PROGRESS',
-            phase: 'followers',
-            progress: 30,
-            message: `Found ${count.toLocaleString()} followers`,
-          } satisfies WhoBackMessage);
+        const result = await source.sync((progress) => {
+          void sendProgress(progress);
         });
 
-        await browser.runtime.sendMessage({
-          type: 'SYNC_PROGRESS',
-          phase: 'following',
-          progress: 55,
-          message: 'Loading following…',
-        } satisfies WhoBackMessage);
-
-        const following = await collectRelationshipList(owner, 'following', (count) => {
-          void browser.runtime.sendMessage({
-            type: 'SYNC_PROGRESS',
-            phase: 'following',
-            progress: 78,
-            message: `Found ${count.toLocaleString()} following`,
-          } satisfies WhoBackMessage);
-        });
+        await sendDetectedAccount(result.account);
 
         await browser.runtime.sendMessage({
           type: 'SYNC_PROGRESS',
           phase: 'processing',
-          progress: 92,
+          progress: 96,
           message: 'Comparing relationships…',
         } satisfies WhoBackMessage);
 
         await browser.runtime.sendMessage({
           type: 'SYNC_COMPLETE',
-          snapshot: { capturedAt: Date.now(), followers, following },
+          account: result.account,
+          snapshot: result.snapshot,
         } satisfies WhoBackMessage);
+
+        return { ok: true };
       } catch (error) {
+        const normalized = normalizeSyncError(error);
         await browser.runtime.sendMessage({
           type: 'SYNC_ERROR',
-          message: error instanceof Error ? error.message : 'Could not sync Instagram.',
+          code: normalized.code,
+          message: normalized.message,
         } satisfies WhoBackMessage);
+        return { ok: false, reason: normalized.code };
       } finally {
         collecting = false;
       }
     };
 
+    browser.runtime.onMessage.addListener((message: WhoBackMessage) => {
+      if (message.type !== 'RUN_SYNC') return;
+      return runSync();
+    });
+
+    await reportAccountFromSession();
+    await reportAccountFromDom();
+
     const observer = new MutationObserver(() => {
-      void reportAccount();
-      void syncIfRequested();
+      void reportAccountFromDom();
     });
     observer.observe(document.documentElement, { subtree: true, childList: true });
-
-    await reportAccount();
-    await syncIfRequested();
   },
 });
 
-async function waitForAccount(
-  report: () => Promise<InstagramAccount | null>,
-  timeout = 12_000,
-): Promise<InstagramAccount> {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const account = await report();
-    if (account) return account;
-    await new Promise((resolve) => setTimeout(resolve, 250));
+async function sendProgress(progress: RelationshipProgress) {
+  const { phase, count, total, page } = progress;
+  const base = phase === 'followers' ? 8 : 52;
+  const span = 40;
+  const ratio = total > 0 ? Math.min(1, count / total) : Math.min(0.9, page / 20);
+  const percent = Math.min(94, Math.round(base + span * ratio));
+  const totalLabel = total > 0 ? ` / ${total.toLocaleString()}` : '';
+
+  await browser.runtime.sendMessage({
+    type: 'SYNC_PROGRESS',
+    phase,
+    progress: percent,
+    message: `${phase === 'followers' ? 'Followers' : 'Following'}: ${count.toLocaleString()}${totalLabel}`,
+  } satisfies WhoBackMessage);
+}
+
+function normalizeSyncError(error: unknown): { code: SyncErrorCode; message: string } {
+  if (error instanceof InstagramSyncError) {
+    return { code: error.code, message: error.message };
   }
-  throw new Error('Could not detect your Instagram account. Refresh instagram.com and try again.');
+
+  return {
+    code: 'UNKNOWN',
+    message: error instanceof Error ? error.message : 'Could not sync Instagram.',
+  };
 }
