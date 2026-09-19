@@ -1,36 +1,42 @@
 import type { InstagramAccount } from '../domain/types';
+import { usernameFromProfileHref } from './profile-identity';
 
-const RESERVED = new Set([
-  'accounts', 'direct', 'explore', 'reels', 'stories', 'about', 'developer', 'legal', 'privacy', 'web',
-]);
+const PROFILE_LABEL = /^(profile|profil)$/i;
 
-function usernameFromHref(href: string | null): string | null {
-  if (!href) return null;
-  try {
-    const url = new URL(href, location.origin);
-    const [segment] = url.pathname.split('/').filter(Boolean);
-    if (!segment || RESERVED.has(segment.toLowerCase())) return null;
-    return segment;
-  } catch {
-    return null;
-  }
+function scoreProfileAnchor(anchor: HTMLAnchorElement): number {
+  let score = 0;
+  const label = [
+    anchor.getAttribute('aria-label'),
+    anchor.getAttribute('title'),
+    anchor.textContent?.trim(),
+    anchor.querySelector<SVGElement>('svg[aria-label]')?.getAttribute('aria-label'),
+  ].filter(Boolean).join(' ');
+
+  if (PROFILE_LABEL.test(label.trim())) score += 8;
+  else if (/\b(profile|profil)\b/i.test(label)) score += 4;
+
+  if (anchor.querySelector('img')) score += 6;
+  if (anchor.closest('nav, header, aside')) score += 2;
+
+  return score;
 }
 
 export function detectCurrentAccount(): InstagramAccount | null {
-  const imageCandidates = [...document.querySelectorAll<HTMLImageElement>('nav img[alt*="profile" i], header img[alt*="profile" i]')];
-  for (const image of imageCandidates) {
-    const anchor = image.closest<HTMLAnchorElement>('a[href]');
-    const username = usernameFromHref(anchor?.getAttribute('href') ?? null);
-    if (username) {
-      return { username, avatarUrl: image.currentSrc || image.src || undefined, detectedAt: Date.now() };
-    }
-  }
+  const anchors = [...document.querySelectorAll<HTMLAnchorElement>('nav a[href], header a[href], aside a[href]')]
+    .map((anchor) => {
+      const username = usernameFromProfileHref(anchor.getAttribute('href'), location.origin);
+      return username ? { anchor, username, score: scoreProfileAnchor(anchor) } : null;
+    })
+    .filter((candidate): candidate is { anchor: HTMLAnchorElement; username: string; score: number } => Boolean(candidate))
+    .sort((a, b) => b.score - a.score);
 
-  const profileLinks = [...document.querySelectorAll<HTMLAnchorElement>('nav a[href^="/"][href$="/"]')];
-  for (const anchor of profileLinks.reverse()) {
-    const username = usernameFromHref(anchor.getAttribute('href'));
-    if (username) return { username, detectedAt: Date.now() };
-  }
+  const best = anchors[0];
+  if (!best || best.score < 4) return null;
 
-  return null;
+  const image = best.anchor.querySelector<HTMLImageElement>('img');
+  return {
+    username: best.username,
+    avatarUrl: image?.currentSrc || image?.src || undefined,
+    detectedAt: Date.now(),
+  };
 }
