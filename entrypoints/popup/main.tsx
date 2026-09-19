@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
 import '../../src/styles.css';
@@ -10,13 +10,133 @@ import { Logo } from '../../src/ui/Logo';
 import { MetricCard } from '../../src/ui/MetricCard';
 import { useExtensionState } from '../../src/ui/use-state';
 
+type PageProbeResult = {
+  username: string;
+  avatarUrl?: string;
+};
+
+function probeInstagramPage(): PageProbeResult | null {
+  const reserved = new Set([
+    'about', 'accounts', 'api', 'challenge', 'create', 'developer', 'direct',
+    'emails', 'explore', 'language', 'legal', 'nametag', 'notifications',
+    'oauth', 'p', 'privacy', 'reels', 'settings', 'static', 'stories', 'web',
+  ]);
+  const usernamePattern = /^[a-zA-Z0-9._]{1,30}$/;
+
+  const candidates = [...document.querySelectorAll<HTMLAnchorElement>('a[href]')]
+    .map((anchor) => {
+      let url: URL;
+      try {
+        url = new URL(anchor.getAttribute('href') ?? '', location.origin);
+      } catch {
+        return null;
+      }
+
+      if (url.hostname.replace(/^www\./, '') !== 'instagram.com') return null;
+
+      const segments = url.pathname.split('/').filter(Boolean);
+      if (segments.length !== 1) return null;
+
+      const username = segments[0];
+      if (!username || !usernamePattern.test(username) || reserved.has(username.toLowerCase())) {
+        return null;
+      }
+
+      const rect = anchor.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+
+      const label = [
+        anchor.getAttribute('aria-label'),
+        anchor.getAttribute('title'),
+        anchor.textContent?.trim(),
+        anchor.querySelector<SVGElement>('svg[aria-label]')?.getAttribute('aria-label'),
+        anchor.querySelector<HTMLImageElement>('img[alt]')?.getAttribute('alt'),
+      ].filter(Boolean).join(' ');
+
+      let score = 0;
+      if (/\b(profile|profil)\b/i.test(label)) score += 10;
+
+      const image = anchor.querySelector<HTMLImageElement>('img');
+      if (image) score += 4;
+      if (anchor.closest('nav, header, aside, [role="navigation"]')) score += 2;
+
+      const desktopRailLimit = Math.min(180, window.innerWidth * 0.14);
+      if (rect.left <= desktopRailLimit && rect.width <= 100 && rect.height <= 100) score += 8;
+
+      return {
+        username,
+        avatarUrl: image?.currentSrc || image?.src || undefined,
+        score,
+      };
+    })
+    .filter((candidate): candidate is PageProbeResult & { score: number } => Boolean(candidate))
+    .sort((a, b) => b.score - a.score);
+
+  const best = candidates[0];
+  if (!best || best.score < 8) return null;
+
+  return {
+    username: best.username,
+    avatarUrl: best.avatarUrl,
+  };
+}
+
+async function probeOpenInstagramTabs(): Promise<boolean> {
+  const tabs = await browser.tabs.query({ url: ['https://www.instagram.com/*'] });
+  const ordered = [...tabs].sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)));
+
+  for (const tab of ordered) {
+    if (!tab.id) continue;
+
+    try {
+      const results = await browser.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: probeInstagramPage,
+      });
+      const result = results.find((entry) => entry.frameId === 0)?.result as PageProbeResult | null | undefined;
+      if (!result?.username) continue;
+
+      await browser.runtime.sendMessage({
+        type: 'ACCOUNT_DETECTED',
+        account: {
+          username: result.username,
+          avatarUrl: result.avatarUrl,
+          detectedAt: Date.now(),
+        },
+      } satisfies WhoBackMessage);
+      return true;
+    } catch {
+      // Try another Instagram tab. The current tab may be navigating or restricted.
+    }
+  }
+
+  return false;
+}
+
 function Popup() {
   const { state, loaded } = useExtensionState();
+  const [probing, setProbing] = useState(false);
+  const probedOnce = useRef(false);
   const latest = state.snapshots.at(-1);
   const previous = state.snapshots.at(-2);
   const analysis = latest ? analyzeSnapshot(latest) : null;
   const changes = latest ? diffSnapshots(previous, latest) : null;
   const busy = ['starting', 'followers', 'following', 'processing'].includes(state.sync.phase);
+
+  const detectAccount = async () => {
+    setProbing(true);
+    try {
+      await probeOpenInstagramTabs();
+    } finally {
+      setProbing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!loaded || state.account || probedOnce.current) return;
+    probedOnce.current = true;
+    void detectAccount();
+  }, [loaded, state.account]);
 
   const openSidePanel = async () => {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -35,10 +155,28 @@ function Popup() {
       {!loaded ? <div className="p-5 text-sm text-muted">Loading…</div> : !state.account ? (
         <div className="p-5">
           <div className="rounded-xl bg-brand-soft p-4">
-            <p className="text-sm font-semibold">Open Instagram to connect</p>
-            <p className="mt-1 text-xs leading-5 text-muted">WhoBack detects the account already signed in to instagram.com. Your password never enters this extension.</p>
+            <p className="text-sm font-semibold">{probing ? 'Detecting Instagram session…' : 'Instagram account not detected'}</p>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              {probing
+                ? 'Checking the Instagram tabs already open in this browser.'
+                : 'Keep instagram.com open while signed in. WhoBack never reads your Instagram password.'}
+            </p>
           </div>
-          <button className="focus-ring mt-4 w-full rounded-xl bg-[#17143f] px-4 py-3 text-sm font-semibold text-white" onClick={() => browser.tabs.create({ url: 'https://www.instagram.com/' })}>Open Instagram</button>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              disabled={probing}
+              className="focus-ring rounded-xl border border-line bg-white px-3 py-3 text-sm font-semibold disabled:opacity-50"
+              onClick={detectAccount}
+            >
+              Retry
+            </button>
+            <button
+              className="focus-ring rounded-xl bg-[#17143f] px-3 py-3 text-sm font-semibold text-white"
+              onClick={() => browser.tabs.create({ url: 'https://www.instagram.com/' })}
+            >
+              Open Instagram
+            </button>
+          </div>
         </div>
       ) : (
         <div className="p-4">
