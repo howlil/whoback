@@ -7,7 +7,7 @@ export default defineConfig({
     name: 'WhoBack',
     description: "See who doesn't follow you back on Instagram.",
     version: '0.1.0',
-    permissions: ['storage', 'tabs', 'alarms'],
+    permissions: ['storage', 'tabs', 'alarms', 'sidePanel'],
     host_permissions: ['https://www.instagram.com/*'],
   },
   vite: () => ({
