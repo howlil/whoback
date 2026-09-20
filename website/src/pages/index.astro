@@ -1,0 +1,302 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Logo from '../components/Logo.astro';
+import { ProductPreview } from '../components/ProductPreview';
+
+const releaseUrl = 'https://github.com/howlil/whoback/releases/latest';
+const repoUrl = 'https://github.com/howlil/whoback';
+
+const outcomes = [
+  {
+    eyebrow: '01',
+    title: "See who doesn't follow you back",
+    body: 'WhoBack compares the people you follow with their follow-back state and gives you the list directly.',
+  },
+  {
+    eyebrow: '02',
+    title: 'See your mutuals',
+    body: 'Keep the people who follow you back in one clean view instead of checking profiles one by one.',
+  },
+  {
+    eyebrow: '03',
+    title: "See who you don't follow back",
+    body: 'When a full follower scan is available, WhoBack also shows accounts that follow you but are not in your following list.',
+  },
+];
+
+const installSteps = [
+  ['Download', 'Get the latest WhoBack ZIP from GitHub Releases.'],
+  ['Extract', 'Unzip it somewhere you will not accidentally delete.'],
+  ['Open extensions', 'Go to chrome://extensions and enable Developer mode.'],
+  ['Load unpacked', 'Select the extracted folder containing manifest.json.'],
+];
+---
+
+<BaseLayout>
+  <header class="border-b border-line bg-white">
+    <div class="page-shell flex h-[72px] items-center justify-between">
+      <Logo />
+      <nav class="hidden items-center gap-7 text-sm text-muted md:flex" aria-label="Primary navigation">
+        <a class="focus-ring rounded-md transition-colors hover:text-ink" href="#product">Product</a>
+        <a class="focus-ring rounded-md transition-colors hover:text-ink" href="#how-it-works">How it works</a>
+        <a class="focus-ring rounded-md transition-colors hover:text-ink" href="#privacy">Privacy</a>
+      </nav>
+      <a
+        class="focus-ring inline-flex items-center gap-2 rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white transition-transform hover:-translate-y-px"
+        href={releaseUrl}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Get WhoBack
+        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+          <path d="M4 10h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-shell grid gap-14 py-20 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:py-28">
+      <div>
+        <p class="mono-label text-[11px] font-semibold text-brand">Chrome extension · Local-first</p>
+        <h1 class="mt-5 max-w-[720px] text-[clamp(2.8rem,6vw,4.9rem)] font-semibold leading-[0.98] tracking-[-0.055em] text-ink">
+          See who follows back.
+          <span class="text-muted">Nothing else to hand over.</span>
+        </h1>
+        <p class="mt-7 max-w-[620px] text-[17px] leading-7 text-muted">
+          WhoBack checks Instagram follow relationships from the session already open in your browser. No password form. No data export. No WhoBack backend.
+        </p>
+        <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+          <a
+            class="focus-ring inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-navy px-5 text-sm font-semibold text-white transition-transform hover:-translate-y-px"
+            href={releaseUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Download latest release
+            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+              <path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5M4 15.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+          <a
+            class="focus-ring inline-flex h-12 items-center justify-center rounded-xl border border-line bg-white px-5 text-sm font-semibold text-ink transition-colors hover:bg-canvas"
+            href={repoUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            View source
+          </a>
+        </div>
+        <p class="mt-5 text-xs leading-5 text-muted">
+          Manual Chrome install for now. Open source. Not affiliated with Instagram or Meta.
+        </p>
+      </div>
+
+      <div class="lg:justify-self-end">
+        <ProductPreview client:load />
+      </div>
+    </section>
+
+    <section class="section-rule">
+      <div class="page-shell grid divide-y divide-line py-0 md:grid-cols-3 md:divide-x md:divide-y-0">
+        <div class="py-6 md:pr-8">
+          <p class="text-sm font-semibold text-ink">No Instagram password</p>
+          <p class="mt-1 text-sm leading-6 text-muted">Uses the session that is already signed in to instagram.com.</p>
+        </div>
+        <div class="py-6 md:px-8">
+          <p class="text-sm font-semibold text-ink">Local-first storage</p>
+          <p class="mt-1 text-sm leading-6 text-muted">Snapshots and scan progress stay in extension storage on your browser.</p>
+        </div>
+        <div class="py-6 md:pl-8">
+          <p class="text-sm font-semibold text-ink">Progress can resume</p>
+          <p class="mt-1 text-sm leading-6 text-muted">Interrupted scans save progress instead of forcing you back to page one.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="product" class="page-shell py-24 lg:py-32">
+      <div class="grid gap-12 lg:grid-cols-[0.72fr_1.28fr]">
+        <div class="lg:sticky lg:top-10 lg:self-start">
+          <p class="mono-label text-[11px] font-semibold text-brand">What it answers</p>
+          <h2 class="mt-4 max-w-[420px] text-4xl font-semibold tracking-[-0.045em] text-ink">
+            The relationship views people actually check.
+          </h2>
+          <p class="mt-5 max-w-[430px] text-base leading-7 text-muted">
+            No dashboard theater. WhoBack is built around a small set of concrete questions about your Instagram graph.
+          </p>
+        </div>
+
+        <div class="border-t border-line">
+          {outcomes.map((item) => (
+            <article class="grid gap-4 border-b border-line py-8 sm:grid-cols-[64px_1fr] sm:gap-8">
+              <div class="mono-label pt-1 text-[11px] font-semibold text-muted">{item.eyebrow}</div>
+              <div>
+                <h3 class="text-2xl font-semibold tracking-[-0.035em] text-ink">{item.title}</h3>
+                <p class="mt-3 max-w-[640px] text-[15px] leading-7 text-muted">{item.body}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="how-it-works" class="section-rule bg-canvas">
+      <div class="page-shell py-24 lg:py-28">
+        <div class="max-w-[680px]">
+          <p class="mono-label text-[11px] font-semibold text-brand">How it works</p>
+          <h2 class="mt-4 text-4xl font-semibold tracking-[-0.045em]">Three steps. No export workflow.</h2>
+        </div>
+
+        <div class="mt-14 grid gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-3">
+          <article class="bg-white p-7">
+            <div class="mono-label text-[11px] font-semibold text-brand">Step 01</div>
+            <h3 class="mt-8 text-xl font-semibold tracking-[-0.025em]">Keep Instagram open</h3>
+            <p class="mt-3 text-sm leading-6 text-muted">Sign in to Instagram in Chrome like you normally do. WhoBack detects the existing session.</p>
+          </article>
+          <article class="bg-white p-7">
+            <div class="mono-label text-[11px] font-semibold text-brand">Step 02</div>
+            <h3 class="mt-8 text-xl font-semibold tracking-[-0.025em]">Run a check</h3>
+            <p class="mt-3 text-sm leading-6 text-muted">WhoBack reads relationship data through the Instagram web session and saves progress as it goes.</p>
+          </article>
+          <article class="bg-white p-7">
+            <div class="mono-label text-[11px] font-semibold text-brand">Step 03</div>
+            <h3 class="mt-8 text-xl font-semibold tracking-[-0.025em]">Inspect the result</h3>
+            <p class="mt-3 text-sm leading-6 text-muted">Open the detail view for not-following-back, mutuals, and other available relationship views.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-shell py-24 lg:py-32">
+      <div class="grid items-start gap-14 lg:grid-cols-2">
+        <div>
+          <p class="mono-label text-[11px] font-semibold text-brand">Recovery by design</p>
+          <h2 class="mt-4 max-w-[520px] text-4xl font-semibold tracking-[-0.045em]">
+            Closing Instagram should pause a scan, not waste it.
+          </h2>
+          <p class="mt-5 max-w-[560px] text-base leading-7 text-muted">
+            Scan progress is checkpointed so recoverable interruptions have a clear path forward. Reopen or resume instead of wondering whether the whole run is gone.
+          </p>
+        </div>
+
+        <div class="overflow-hidden rounded-2xl border border-line bg-white">
+          <div class="border-b border-line px-5 py-4">
+            <div class="flex items-center gap-2 text-sm font-semibold">
+              <span class="size-2 rounded-full bg-amber-500"></span>
+              Scan paused
+            </div>
+          </div>
+          <div class="p-5">
+            <div class="rounded-xl bg-warn-soft p-4 text-warn">
+              <p class="text-sm font-semibold">Your progress is safe.</p>
+              <p class="mt-1 text-sm leading-6">Instagram was closed. Resume when you are ready.</p>
+              <p class="mt-2 text-xs opacity-75">Saved: 616 following · 0 followers.</p>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-2">
+              <div class="rounded-xl bg-navy px-4 py-3 text-center text-sm font-semibold text-white">Resume scan</div>
+              <div class="rounded-xl border border-line px-4 py-3 text-center text-sm font-semibold">Start over</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy" class="section-rule">
+      <div class="page-shell grid gap-14 py-24 lg:grid-cols-[0.9fr_1.1fr] lg:py-28">
+        <div>
+          <p class="mono-label text-[11px] font-semibold text-brand">Privacy model</p>
+          <h2 class="mt-4 max-w-[480px] text-4xl font-semibold tracking-[-0.045em]">
+            Small data contract. Easy to inspect.
+          </h2>
+          <p class="mt-5 max-w-[500px] text-base leading-7 text-muted">
+            WhoBack is open source and intentionally avoids an application backend. The browser extension does the work where your Instagram session already exists.
+          </p>
+        </div>
+
+        <div class="border-t border-line font-mono text-sm">
+          <div class="grid grid-cols-[130px_1fr] gap-4 border-b border-line py-5">
+            <span class="text-muted">password</span>
+            <span class="font-medium text-ink">not collected</span>
+          </div>
+          <div class="grid grid-cols-[130px_1fr] gap-4 border-b border-line py-5">
+            <span class="text-muted">backend</span>
+            <span class="font-medium text-ink">none</span>
+          </div>
+          <div class="grid grid-cols-[130px_1fr] gap-4 border-b border-line py-5">
+            <span class="text-muted">session</span>
+            <span class="font-medium text-ink">existing Instagram browser session</span>
+          </div>
+          <div class="grid grid-cols-[130px_1fr] gap-4 border-b border-line py-5">
+            <span class="text-muted">results</span>
+            <span class="font-medium text-ink">local extension storage</span>
+          </div>
+          <div class="grid grid-cols-[130px_1fr] gap-4 border-b border-line py-5">
+            <span class="text-muted">source</span>
+            <a class="focus-ring font-medium text-brand underline decoration-brand/30 underline-offset-4" href={repoUrl} target="_blank" rel="noreferrer">github.com/howlil/whoback</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-navy text-white">
+      <div class="page-shell grid gap-10 py-20 lg:grid-cols-[0.8fr_1.2fr] lg:items-start lg:py-24">
+        <div>
+          <p class="mono-label text-[11px] font-semibold text-white/55">Worth knowing</p>
+          <h2 class="mt-4 text-3xl font-semibold tracking-[-0.04em]">WhoBack is deliberately honest about its limits.</h2>
+        </div>
+        <div class="grid gap-6 text-sm leading-7 text-white/70 md:grid-cols-2">
+          <p>
+            WhoBack is an independent project and is not affiliated with Instagram or Meta. It relies on internal Instagram Web behavior rather than a documented consumer API for full follower/following access.
+          </p>
+          <p>
+            Instagram can change or rate-limit those endpoints. WhoBack slows requests, saves progress, and stops on restriction signals, but it cannot promise that rate limits will never happen.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="install" class="page-shell py-24 lg:py-32">
+      <div class="grid gap-12 lg:grid-cols-[0.75fr_1.25fr]">
+        <div>
+          <p class="mono-label text-[11px] font-semibold text-brand">Install</p>
+          <h2 class="mt-4 max-w-[460px] text-4xl font-semibold tracking-[-0.045em]">Install the current release manually in Chrome.</h2>
+          <p class="mt-5 max-w-[470px] text-base leading-7 text-muted">
+            WhoBack is not in the Chrome Web Store yet. The release ZIP is the supported distribution path for now.
+          </p>
+          <a
+            class="focus-ring mt-7 inline-flex h-12 items-center justify-center rounded-xl bg-navy px-5 text-sm font-semibold text-white"
+            href={releaseUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open GitHub Releases
+          </a>
+        </div>
+
+        <ol class="border-t border-line">
+          {installSteps.map(([title, body], index) => (
+            <li class="grid grid-cols-[48px_1fr] gap-4 border-b border-line py-5 sm:grid-cols-[72px_180px_1fr] sm:gap-6">
+              <div class="mono-label pt-0.5 text-[11px] font-semibold text-muted">{String(index + 1).padStart(2, '0')}</div>
+              <div class="font-semibold text-ink">{title}</div>
+              <div class="text-sm leading-6 text-muted">{body}</div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-line">
+    <div class="page-shell flex flex-col gap-5 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-3">
+        <Logo />
+        <span class="hidden h-4 w-px bg-line sm:block"></span>
+        <span class="text-xs">Open-source Chrome extension</span>
+      </div>
+      <div class="flex gap-5">
+        <a class="focus-ring rounded-md hover:text-ink" href={repoUrl} target="_blank" rel="noreferrer">GitHub</a>
+        <a class="focus-ring rounded-md hover:text-ink" href={releaseUrl} target="_blank" rel="noreferrer">Releases</a>
+      </div>
+    </div>
+  </footer>
+</BaseLayout>
