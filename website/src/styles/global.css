@@ -472,7 +472,7 @@ button:focus-visible {
   border-radius: 26px;
   background: #f0f1f5;
   padding: 10px;
-  box-shadow: 0 16px 38px rgb(18 19 26 / 0.035);
+  box-shadow: none;
 }
 
 .feature-stack {
@@ -1044,22 +1044,64 @@ footer { border-top: 1px solid var(--color-line); }
 .interactive-background__grid {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, rgb(18 19 26 / 0.055) 0.8px, transparent 0.9px);
-  background-size: 30px 30px;
-  opacity: 0.42;
-  mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.52) 68%, transparent 100%);
+  background-image:
+    linear-gradient(rgb(18 19 26 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(18 19 26 / 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.46;
+  mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.58) 66%, transparent 100%);
 }
 
-.interactive-background__spotlight {
+.interactive-background__cursor {
   position: absolute;
-  top: -260px;
-  left: -260px;
-  width: 520px;
-  height: 520px;
+  top: -58px;
+  left: -58px;
+  width: 116px;
+  height: 116px;
+  border: 1px solid rgb(91 77 247 / 0.16);
   border-radius: 50%;
-  background: radial-gradient(circle, rgb(91 77 247 / 0.075) 0%, rgb(91 77 247 / 0.03) 34%, transparent 70%);
-  filter: blur(10px);
   will-change: transform;
+}
+
+.interactive-background__cursor::before,
+.interactive-background__cursor::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: rgb(91 77 247 / 0.16);
+  content: '';
+  transform: translate(-50%, -50%);
+}
+
+.interactive-background__cursor::before {
+  width: 18px;
+  height: 1px;
+}
+
+.interactive-background__cursor::after {
+  width: 1px;
+  height: 18px;
+}
+
+.interactive-background__orbit {
+  position: absolute;
+  border: 1px solid rgb(18 19 26 / 0.055);
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.interactive-background__orbit--one {
+  top: 15%;
+  left: 6%;
+  width: 270px;
+  height: 270px;
+}
+
+.interactive-background__orbit--two {
+  right: 5%;
+  bottom: 14%;
+  width: 180px;
+  height: 180px;
 }
 
 footer {
@@ -1201,6 +1243,8 @@ footer {
 
 @media (max-width: 760px) {
   .page-shell { width: min(100% - 28px, 1080px); }
+  .interactive-background__cursor,
+  .interactive-background__orbit { display: none; }
   .floating-header { top: 10px; }
   .compact-nav { width: calc(100% - 20px); }
   .reference-hero { padding-top: 88px; }
@@ -1238,6 +1282,11 @@ footer {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+
+  .interactive-background__cursor,
+  .interactive-background__orbit {
+    display: none;
+  }
   *, *::before, *::after {
     scroll-behavior: auto !important;
     animation: none !important;
