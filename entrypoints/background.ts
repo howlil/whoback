@@ -1,9 +1,14 @@
 import { browser } from 'wxt/browser';
 import { diffSnapshots } from '../src/domain/relationship';
-import type { ExtensionState, SyncErrorCode } from '../src/domain/types';
+import type {
+  ExtensionState,
+  ScanCheckpoint,
+  SyncErrorCode,
+} from '../src/domain/types';
 import { isInstagramUsername } from '../src/instagram/profile-identity';
 import {
   runInstagramMainWorldSync,
+  type MainWorldSyncInput,
   type MainWorldSyncResult,
 } from '../src/instagram/main-world-sync';
 import type { WhoBackMessage } from '../src/lib/messages';
@@ -16,17 +21,18 @@ import {
 } from '../src/lib/state';
 
 const ALARM = 'whoback-auto-sync';
+const INSTAGRAM_URL = 'https://www.instagram.com/';
 
 export default defineBackground({
   type: 'module',
   main() {
     browser.runtime.onInstalled.addListener(() => {
       void ensureAlarm();
-      void sanitizePersistedAccount();
+      void sanitizePersistedState();
     });
     browser.runtime.onStartup.addListener(() => {
       void ensureAlarm();
-      void sanitizePersistedAccount();
+      void sanitizePersistedState();
       void maybeAutoSync();
     });
     browser.alarms.onAlarm.addListener((alarm) => {
@@ -38,7 +44,7 @@ export default defineBackground({
     });
 
     void ensureAlarm();
-    void sanitizePersistedAccount();
+    void sanitizePersistedState();
   },
 });
 
@@ -46,13 +52,21 @@ async function ensureAlarm() {
   await browser.alarms.create(ALARM, { periodInMinutes: 60 });
 }
 
-async function sanitizePersistedAccount() {
+async function sanitizePersistedState() {
   const state = await getState();
-  if (!state.account || isInstagramUsername(state.account.username)) return;
+  const accountValid = !state.account || isInstagramUsername(state.account.username);
+  const checkpointValid = !state.scanCheckpoint
+    || (
+      state.scanCheckpoint.version === 1
+      && Boolean(state.scanCheckpoint.accountId)
+    );
+
+  if (accountValid && checkpointValid) return;
 
   await setState({
     ...state,
-    account: null,
+    account: accountValid ? state.account : null,
+    scanCheckpoint: checkpointValid ? state.scanCheckpoint : undefined,
     sync: { phase: 'idle', progress: 0 },
   });
 }
@@ -67,8 +81,25 @@ function isBusy(state: ExtensionState) {
   return ['starting', 'followers', 'following', 'processing'].includes(state.sync.phase);
 }
 
+async function resolveViewerId(state: ExtensionState): Promise<string | null> {
+  try {
+    const cookie = await browser.cookies.get({
+      url: INSTAGRAM_URL,
+      name: 'ds_user_id',
+    });
+
+    if (cookie?.value?.trim()) return cookie.value.trim();
+  } catch {
+    // Fall back to previously confirmed local identity.
+  }
+
+  return state.account?.platformUserId
+    ?? state.scanCheckpoint?.accountId
+    ?? null;
+}
+
 async function startSync(username?: string) {
-  const state = await getState();
+  let state = await getState();
   const expectedUsername = username ?? state.account?.username;
 
   if (isBusy(state)) return;
@@ -78,10 +109,31 @@ async function startSync(username?: string) {
     const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
     await setSyncError(
       'RATE_LIMITED',
-      `Instagram is still cooling down. Try again in about ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}.`,
+      `Instagram is still cooling down. Resume in about ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}.`,
       state.sync.cooldownUntil,
     );
     return;
+  }
+
+  const viewerId = await resolveViewerId(state);
+  if (!viewerId) {
+    await setSyncError(
+      'SESSION_ID_MISSING',
+      'WhoBack could not read the Instagram session ID. Refresh instagram.com and make sure you are signed in.',
+    );
+    return;
+  }
+
+  if (state.scanCheckpoint && state.scanCheckpoint.accountId !== viewerId) {
+    state = await patchState({ scanCheckpoint: undefined });
+  }
+
+  if (state.account?.platformUserId !== viewerId) {
+    state = await patchState({
+      account: state.account
+        ? { ...state.account, platformUserId: viewerId }
+        : state.account,
+    });
   }
 
   const tab = await findInstagramTab();
@@ -93,18 +145,35 @@ async function startSync(username?: string) {
     return;
   }
 
+  const checkpoint = state.scanCheckpoint?.accountId === viewerId
+    ? state.scanCheckpoint
+    : undefined;
+
   await patchState({
     sync: {
       phase: 'starting',
-      progress: 8,
-      message: 'Reading followers and following from Instagram…',
+      progress: checkpoint ? checkpointProgress(checkpoint) : 8,
+      message: checkpoint
+        ? `Resuming saved scan · ${checkpoint.following.users.length.toLocaleString()} following · ${checkpoint.followers.users.length.toLocaleString()} followers`
+        : 'Starting Instagram relationship scan…',
       startedAt: Date.now(),
       tabId: tab.id,
       cooldownUntil: undefined,
     },
   });
 
-  void dispatchMainWorldSync(tab.id, expectedUsername);
+  void dispatchMainWorldSync(tab.id, {
+    viewerId,
+    expectedUsername: expectedUsername ?? null,
+    checkpoint: checkpoint ?? null,
+  });
+}
+
+function checkpointProgress(checkpoint: ScanCheckpoint): number {
+  if (checkpoint.followers.pages > 0 || checkpoint.following.done) {
+    return Math.min(94, 54 + checkpoint.followers.pages * 3);
+  }
+  return Math.min(48, 12 + checkpoint.following.pages * 3);
 }
 
 async function findInstagramTab() {
@@ -112,37 +181,45 @@ async function findInstagramTab() {
   return [...tabs].sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)))[0];
 }
 
-async function dispatchMainWorldSync(tabId: number, expectedUsername?: string) {
+async function dispatchMainWorldSync(tabId: number, input: MainWorldSyncInput) {
   try {
-    const result = await executeMainWorldSync(tabId, expectedUsername);
+    const result = await executeMainWorldSync(tabId, input);
     await applyMainWorldResult(result);
     return;
   } catch {
-    // If the page was mid-navigation, reload once and retry in a fresh document.
+    // Page navigation can invalidate an injection. Reload once, then resume from
+    // the latest checkpoint already persisted by the content-script bridge.
   }
 
   try {
     await browser.tabs.reload(tabId);
     await waitForTabComplete(tabId, 15_000);
-    const result = await executeMainWorldSync(tabId, expectedUsername);
+    const latest = await getState();
+    const resumedInput: MainWorldSyncInput = {
+      ...input,
+      checkpoint: latest.scanCheckpoint?.accountId === input.viewerId
+        ? latest.scanCheckpoint
+        : input.checkpoint,
+    };
+    const result = await executeMainWorldSync(tabId, resumedInput);
     await applyMainWorldResult(result);
   } catch {
     await setSyncError(
       'INJECTION_FAILED',
-      'WhoBack could not run inside the Instagram page. Reload instagram.com and try again.',
+      'WhoBack could not run inside the Instagram page. Your saved scan progress is safe.',
     );
   }
 }
 
 async function executeMainWorldSync(
   tabId: number,
-  expectedUsername?: string,
+  input: MainWorldSyncInput,
 ): Promise<MainWorldSyncResult> {
   const results = await browser.scripting.executeScript({
     target: { tabId },
     world: 'MAIN',
     func: runInstagramMainWorldSync,
-    args: [expectedUsername ?? null],
+    args: [input],
   });
 
   const result = results[0]?.result as MainWorldSyncResult | undefined;
@@ -154,7 +231,18 @@ async function executeMainWorldSync(
 
 async function applyMainWorldResult(result: MainWorldSyncResult) {
   if (!result.ok) {
-    const cooldownUntil = result.error.code === 'RATE_LIMITED'
+    if (result.checkpoint) {
+      await persistCheckpoint(result.checkpoint);
+    }
+
+    if (result.error.code === 'SYNC_ABORTED') {
+      return;
+    }
+
+    const shouldCoolDown = result.error.code === 'RATE_LIMITED'
+      || result.error.code === 'REQUEST_BLOCKED';
+
+    const cooldownUntil = shouldCoolDown
       ? Date.now() + (result.error.retryAfterMs ?? 15 * 60 * 1000)
       : undefined;
 
@@ -180,11 +268,12 @@ async function applyMainWorldResult(result: MainWorldSyncResult) {
   await setState({
     ...state,
     account: {
-      ...state.account,
+      ...(state.account ?? { username: result.account.username }),
       username: result.account.username,
       platformUserId: result.account.platformUserId,
       detectedAt: result.account.detectedAt,
     },
+    scanCheckpoint: undefined,
     snapshots,
     sync: {
       phase: 'complete',
@@ -195,6 +284,19 @@ async function applyMainWorldResult(result: MainWorldSyncResult) {
   });
 
   await updateBadge(badgeCount, state.settings.showBadge);
+}
+
+async function persistCheckpoint(checkpoint: ScanCheckpoint) {
+  const state = await getState();
+  if (
+    state.scanCheckpoint
+    && state.scanCheckpoint.accountId === checkpoint.accountId
+    && state.scanCheckpoint.updatedAt > checkpoint.updatedAt
+  ) {
+    return;
+  }
+
+  await patchState({ scanCheckpoint: checkpoint });
 }
 
 async function waitForTabComplete(tabId: number, timeoutMs: number) {
@@ -223,7 +325,14 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
     case 'ACCOUNT_DETECTED': {
       if (!isInstagramUsername(message.account.username)) return { ok: false };
 
-      const state = await patchState({ account: message.account });
+      const current = await getState();
+      const state = await patchState({
+        account: {
+          ...message.account,
+          platformUserId: current.account?.platformUserId,
+        },
+      });
+
       if (canAutoSync(state) && !isBusy(state)) {
         void startSync(message.account.username);
       }
@@ -232,6 +341,11 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
 
     case 'START_SYNC': {
       await startSync();
+      return { ok: true };
+    }
+
+    case 'SCAN_CHECKPOINT': {
+      await persistCheckpoint(message.checkpoint);
       return { ok: true };
     }
 
@@ -259,6 +373,7 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
       await setState({
         ...state,
         account: message.account ?? state.account,
+        scanCheckpoint: undefined,
         snapshots,
         sync: {
           phase: 'complete',
