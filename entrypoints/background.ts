@@ -234,7 +234,7 @@ async function runAdaptiveSync(
       recordOperation(checkpoint, counts);
 
       if (!counts.ok) {
-        if (isHardStop(counts)) {
+        if (isHardStop(counts) || isRecoverablePause(counts)) {
           await finishFailure(counts, checkpoint);
           return;
         }
@@ -679,17 +679,21 @@ function isHardStop(result: InstagramOperationFailure) {
   ].includes(result.error.code);
 }
 
+function isRecoverablePause(result: InstagramOperationFailure) {
+  return [
+    'NO_INSTAGRAM_TAB',
+    'INJECTION_FAILED',
+    'NETWORK_ERROR',
+  ].includes(result.error.code);
+}
+
 async function finishFailure(
   result: InstagramOperationFailure,
   checkpoint: ScanCheckpoint,
 ) {
   await persistCheckpoint(checkpoint);
 
-  if (
-    result.error.code === 'NO_INSTAGRAM_TAB'
-    || result.error.code === 'INJECTION_FAILED'
-    || result.error.code === 'NETWORK_ERROR'
-  ) {
+  if (isRecoverablePause(result)) {
     await setSyncPaused(result.error.code, result.error.message);
     return;
   }
@@ -956,10 +960,9 @@ async function setSyncPaused(
     sync: {
       ...state.sync,
       phase: 'paused',
-      progress: checkpointProgress(state.scanCheckpoint ?? newCheckpoint(
-        state.account?.platformUserId ?? '',
-        state.account?.username,
-      )),
+      progress: state.scanCheckpoint
+        ? checkpointProgress(state.scanCheckpoint)
+        : state.sync.progress,
       errorCode: code,
       message,
       finishedAt: Date.now(),
