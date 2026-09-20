@@ -23,11 +23,11 @@ function SidePanel() {
   const previous = state.snapshots.at(-2);
   const analysis = latest ? analyzeSnapshot(latest) : null;
   const changes = latest ? diffSnapshots(previous, latest) : null;
-  const busy = ['starting', 'followers', 'following', 'processing'].includes(state.sync.phase);
+  const busy = ['starting', 'planning', 'followers', 'following', 'verifying', 'processing'].includes(state.sync.phase);
 
   const rows = useMemo(() => {
     if (!analysis) return [];
-    const source = view === 'not-back' ? analysis.notFollowingBack : view === 'fans' ? analysis.youDontFollowBack : analysis.mutual;
+    const source = view === 'not-back' ? analysis.notFollowingBack : view === 'fans' ? (analysis.followersComplete ? analysis.youDontFollowBack : []) : analysis.mutual;
     const q = query.trim().toLowerCase();
     return q ? source.filter((username) => username.includes(q)) : source;
   }, [analysis, query, view]);
@@ -38,11 +38,11 @@ function SidePanel() {
     </header>
 
     {!analysis ? <div className="p-5"><div className="rounded-2xl border border-dashed border-line bg-white p-5 text-center"><p className="text-sm font-semibold">No relationship snapshot yet</p><p className="mt-1 text-xs leading-5 text-muted">Open Instagram and run the first sync from the WhoBack popup.</p></div></div> : <>
-      {changes && previous && <section className="grid grid-cols-2 gap-2 p-4 pb-0"><div className="rounded-xl bg-positive-soft p-3"><div className="text-lg font-semibold text-positive">+{changes.newFollowers.length}</div><div className="text-[11px] text-positive/80">New followers</div></div><div className="rounded-xl bg-danger-soft p-3"><div className="text-lg font-semibold text-danger">−{changes.unfollowers.length}</div><div className="text-[11px] text-danger/80">Unfollowed you</div></div></section>}
+      {changes && previous && changes.followersComplete && <section className="grid grid-cols-2 gap-2 p-4 pb-0"><div className="rounded-xl bg-positive-soft p-3"><div className="text-lg font-semibold text-positive">+{changes.newFollowers.length}</div><div className="text-[11px] text-positive/80">New followers</div></div><div className="rounded-xl bg-danger-soft p-3"><div className="text-lg font-semibold text-danger">−{changes.unfollowers.length}</div><div className="text-[11px] text-danger/80">Unfollowed you</div></div></section>}
 
-      <nav className="mt-4 flex border-b border-line bg-white px-2">{views.map((item) => <button key={item.id} onClick={() => setView(item.id)} className={`focus-ring flex-1 border-b-2 px-2 py-3 text-[11px] font-semibold ${view === item.id ? 'border-brand text-brand' : 'border-transparent text-muted'}`}>{item.label}<span className="ml-1 opacity-60">({item.id === 'not-back' ? analysis.notFollowingBack.length : item.id === 'fans' ? analysis.youDontFollowBack.length : analysis.mutual.length})</span></button>)}</nav>
+      <nav className="mt-4 flex border-b border-line bg-white px-2">{views.map((item) => { const unavailable = item.id === 'fans' && !analysis.followersComplete; return <button key={item.id} disabled={unavailable} onClick={() => setView(item.id)} className={`focus-ring flex-1 border-b-2 px-2 py-3 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${view === item.id ? 'border-brand text-brand' : 'border-transparent text-muted'}`}>{item.label}<span className="ml-1 opacity-60">({item.id === 'not-back' ? analysis.notFollowingBack.length : item.id === 'fans' ? (analysis.followersComplete ? analysis.youDontFollowBack.length : '—') : analysis.mutual.length})</span></button>; })}</nav>
 
-      <section className="p-3">
+      {!analysis.followersComplete && <div className="mx-3 mt-3 rounded-xl bg-brand-soft p-3 text-xs leading-5 text-brand">Fast scan skipped the full follower list because checking the people you follow required fewer Instagram requests. “You don’t follow” and follower-history changes require a full follower scan.</div>}<section className="p-3">
         <label className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2.5"><SearchIcon className="size-4 text-muted"/><input className="w-full bg-transparent text-sm outline-none placeholder:text-muted" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search username…"/></label>
         <div className="mt-2 overflow-hidden rounded-xl border border-line bg-white">{rows.length === 0 ? <div className="p-5 text-center text-xs text-muted">No accounts found.</div> : rows.map((username) => <div key={username} className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0"><Avatar username={username} size="sm"/><div className="min-w-0 flex-1 truncate text-sm font-medium">@{username}</div><button className="focus-ring flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-[11px] font-semibold hover:bg-canvas" onClick={() => browser.tabs.create({ url: `https://www.instagram.com/${encodeURIComponent(username)}/` })}>Profile <ExternalIcon className="size-3"/></button></div>)}</div>
       </section>
