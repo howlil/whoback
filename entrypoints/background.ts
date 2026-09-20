@@ -126,7 +126,7 @@ async function executeMainWorldSync(
     target: { tabId },
     world: 'MAIN',
     func: runInstagramMainWorldSync,
-    args: [expectedUsername],
+    args: [expectedUsername ?? null],
   });
 
   const result = results[0]?.result as MainWorldSyncResult | undefined;
