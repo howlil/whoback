@@ -145,6 +145,10 @@ export async function runInstagramMainWorldSync(
     };
   };
 
+  const uniqueUsernames = (
+    users: Array<{ id: string; username: string }>,
+  ) => [...new Set(users.map((user) => normalize(user.username)).filter(Boolean))].sort();
+
   const mergeUsers = (
     current: Array<{ id: string; username: string }>,
     incoming: Array<Record<string, unknown>>,
@@ -410,14 +414,8 @@ export async function runInstagramMainWorldSync(
       },
       snapshot: {
         capturedAt: Date.now(),
-        followers: checkpoint.followers.users
-          .map((user) => user.username)
-          .filter(Boolean)
-          .sort(),
-        following: checkpoint.following.users
-          .map((user) => user.username)
-          .filter(Boolean)
-          .sort(),
+        followers: uniqueUsernames(checkpoint.followers.users),
+        following: uniqueUsernames(checkpoint.following.users),
       },
     };
   } finally {
