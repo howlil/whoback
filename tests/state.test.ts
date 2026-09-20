@@ -18,10 +18,12 @@ function makeState(overrides: Partial<ExtensionState> = {}): ExtensionState {
 
 function checkpoint(): ScanCheckpoint {
   return {
-    version: 1,
+    version: 2,
     accountId: '123',
     username: 'mraulabsr',
     phase: 'following',
+    followingTotal: 10,
+    followersTotal: 100,
     following: {
       users: [{ id: '1', username: 'alice' }],
       cursor: 'next',
@@ -33,7 +35,18 @@ function checkpoint(): ScanCheckpoint {
       done: false,
       pages: 0,
     },
+    verified: {},
     requestCount: 1,
+    telemetry: {
+      requests: 1,
+      networkMs: 10,
+      plannedWaitMs: 0,
+      actualWaitMs: 0,
+      storageWriteMs: 0,
+      followingPages: 1,
+      followerPages: 0,
+      relationshipChecks: 0,
+    },
     startedAt: 1,
     updatedAt: 2,
   };
