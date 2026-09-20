@@ -1,214 +1,103 @@
-import type { ScanCheckpoint, SyncErrorCode } from '../domain/types';
+import type { InstagramUserRef, SyncErrorCode } from '../domain/types';
 
-export type MainWorldSyncInput = {
-  viewerId: string;
-  expectedUsername?: string | null;
-  checkpoint?: ScanCheckpoint | null;
-};
+export type InstagramOperation =
+  | {
+      kind: 'counts';
+      viewerId: string;
+    }
+  | {
+      kind: 'list-page';
+      viewerId: string;
+      list: 'followers' | 'following';
+      cursor?: string;
+    }
+  | {
+      kind: 'relationship';
+      viewerId: string;
+      targetUserId: string;
+    };
 
-export type MainWorldSyncSuccess = {
-  ok: true;
-  account: {
-    username: string;
-    platformUserId: string;
-    detectedAt: number;
-  };
-  snapshot: {
-    capturedAt: number;
-    followers: string[];
-    following: string[];
-  };
-};
+export type InstagramOperationSuccess =
+  | {
+      ok: true;
+      kind: 'counts';
+      durationMs: number;
+      followingTotal: number | null;
+      followersTotal: number | null;
+    }
+  | {
+      ok: true;
+      kind: 'list-page';
+      durationMs: number;
+      users: InstagramUserRef[];
+      nextCursor?: string;
+      done: boolean;
+      rawCount: number;
+    }
+  | {
+      ok: true;
+      kind: 'relationship';
+      durationMs: number;
+      targetUserId: string;
+      followedBy: boolean;
+      following: boolean;
+    };
 
-export type MainWorldSyncFailure = {
+export type InstagramOperationFailure = {
   ok: false;
+  durationMs: number;
   error: {
     code: SyncErrorCode;
     message: string;
     status?: number;
     retryAfterMs?: number;
   };
-  checkpoint?: ScanCheckpoint;
 };
 
-export type MainWorldSyncResult = MainWorldSyncSuccess | MainWorldSyncFailure;
+export type InstagramOperationResult =
+  | InstagramOperationSuccess
+  | InstagramOperationFailure;
 
 /**
- * IMPORTANT: This function is passed to chrome.scripting.executeScript.
- * Chrome serializes only the function body, so it must remain closure-free:
- * no runtime imports, module constants, or helpers referenced from outside.
+ * IMPORTANT: Chrome serializes this function for MAIN-world execution.
+ * Keep the implementation closure-free.
  */
-export async function runInstagramMainWorldSync(
-  input: MainWorldSyncInput,
-): Promise<MainWorldSyncResult> {
+export async function runInstagramOperation(
+  operation: InstagramOperation,
+): Promise<InstagramOperationResult> {
   const API_BASE = '/api/v1';
   const IG_APP_ID = '936619743392459';
-  const MAX_PAGES_PER_LIST = 500;
-  const CHECKPOINT_VERSION = 1 as const;
+  const startedAt = performance.now();
 
-  const runtimeScope = globalThis as typeof globalThis & {
-    __WHOBACK_RUNTIME__?: {
-      scanId: string;
-      controller: AbortController;
-    };
-  };
-
-  runtimeScope.__WHOBACK_RUNTIME__?.controller.abort();
-
-  const controller = new AbortController();
-  const scanId = globalThis.crypto?.randomUUID?.() ?? `whoback-${Date.now()}-${Math.random()}`;
-  runtimeScope.__WHOBACK_RUNTIME__ = { scanId, controller };
-
-  const normalize = (value: unknown) =>
-    String(value ?? '').trim().replace(/^@/, '').toLowerCase();
-
-  const sleep = (ms: number) =>
-    new Promise<void>((resolve, reject) => {
-      if (controller.signal.aborted) {
-        reject(new DOMException('Scan aborted', 'AbortError'));
-        return;
-      }
-
-      const timer = globalThis.setTimeout(resolve, ms);
-      controller.signal.addEventListener('abort', () => {
-        globalThis.clearTimeout(timer);
-        reject(new DOMException('Scan aborted', 'AbortError'));
-      }, { once: true });
-    });
+  const duration = () => Math.max(0, performance.now() - startedAt);
 
   const fail = (
     code: SyncErrorCode,
     message: string,
-    checkpoint?: ScanCheckpoint,
     status?: number,
     retryAfterMs?: number,
-  ): MainWorldSyncFailure => ({
+  ): InstagramOperationFailure => ({
     ok: false,
+    durationMs: duration(),
     error: {
       code,
       message,
       ...(status ? { status } : {}),
       ...(retryAfterMs ? { retryAfterMs } : {}),
     },
-    ...(checkpoint ? { checkpoint } : {}),
   });
-
-  const postBridge = (payload: Record<string, unknown>) => {
-    if (
-      typeof window !== 'undefined'
-      && typeof window.postMessage === 'function'
-    ) {
-      window.postMessage({ source: 'whoback-main', ...payload }, '*');
-    }
-  };
-
-  const cloneCheckpoint = (source?: ScanCheckpoint | null): ScanCheckpoint => {
-    const valid = source
-      && source.version === CHECKPOINT_VERSION
-      && source.accountId === input.viewerId;
-
-    if (valid) {
-      return {
-        ...source,
-        username: normalize(input.expectedUsername) || source.username,
-        following: {
-          ...source.following,
-          users: source.following.users.map((user) => ({ ...user })),
-        },
-        followers: {
-          ...source.followers,
-          users: source.followers.users.map((user) => ({ ...user })),
-        },
-        updatedAt: Date.now(),
-      };
-    }
-
-    const now = Date.now();
-    return {
-      version: CHECKPOINT_VERSION,
-      accountId: input.viewerId,
-      username: normalize(input.expectedUsername) || undefined,
-      phase: 'following',
-      following: {
-        users: [],
-        done: false,
-        pages: 0,
-      },
-      followers: {
-        users: [],
-        done: false,
-        pages: 0,
-      },
-      requestCount: 0,
-      startedAt: now,
-      updatedAt: now,
-    };
-  };
-
-  const uniqueUsernames = (
-    users: Array<{ id: string; username: string }>,
-  ) => [...new Set(users.map((user) => normalize(user.username)).filter(Boolean))].sort();
-
-  const mergeUsers = (
-    current: Array<{ id: string; username: string }>,
-    incoming: Array<Record<string, unknown>>,
-  ) => {
-    const users = new Map(current.map((user) => [user.id, user]));
-
-    for (const raw of incoming) {
-      const idRaw = raw.pk ?? raw.id;
-      const id = idRaw == null ? '' : String(idRaw);
-      const username = normalize(raw.username);
-      if (!id || !username) continue;
-      users.set(id, { id, username });
-    }
-
-    return [...users.values()];
-  };
-
-  const checkpoint = cloneCheckpoint(input.checkpoint);
-
-  const emitCheckpoint = () => {
-    checkpoint.updatedAt = Date.now();
-    postBridge({
-      type: 'checkpoint',
-      checkpoint,
-    });
-  };
-
-  const emitProgress = (
-    phase: 'following' | 'followers',
-    count: number,
-    pages: number,
-  ) => {
-    const progress = phase === 'following'
-      ? Math.min(48, 12 + pages * 3)
-      : Math.min(94, 54 + pages * 3);
-
-    postBridge({
-      type: 'progress',
-      phase,
-      progress,
-      message: `${phase === 'following' ? 'Following' : 'Followers'}: ${count.toLocaleString()} loaded · page ${pages}`,
-    });
-  };
 
   const request = async (
     path: string,
   ): Promise<
     | { ok: true; data: Record<string, unknown> }
-    | MainWorldSyncFailure
+    | InstagramOperationFailure
   > => {
-    if (controller.signal.aborted) {
-      return fail('SYNC_ABORTED', 'The previous WhoBack scan was replaced by a newer scan.', checkpoint);
-    }
-
     let response: Response;
     try {
       response = await fetch(`${API_BASE}${path}`, {
         method: 'GET',
         credentials: 'include',
-        signal: controller.signal,
         headers: {
           accept: 'application/json',
           'x-ig-app-id': IG_APP_ID,
@@ -216,17 +105,10 @@ export async function runInstagramMainWorldSync(
           'x-asbd-id': '198387',
         },
       });
-      checkpoint.requestCount += 1;
-      checkpoint.updatedAt = Date.now();
     } catch {
-      if (controller.signal.aborted) {
-        return fail('SYNC_ABORTED', 'The previous WhoBack scan was replaced by a newer scan.', checkpoint);
-      }
-
       return fail(
         'NETWORK_ERROR',
         'Instagram request failed inside the signed-in page. Reload Instagram and try again.',
-        checkpoint,
       );
     }
 
@@ -235,7 +117,6 @@ export async function runInstagramMainWorldSync(
         return fail(
           'SESSION_EXPIRED',
           'Your Instagram session expired. Refresh Instagram and sign in again.',
-          checkpoint,
           401,
         );
       }
@@ -244,21 +125,27 @@ export async function runInstagramMainWorldSync(
         return fail(
           'REQUEST_BLOCKED',
           'Instagram temporarily blocked this scan. Progress was saved; wait before resuming.',
-          checkpoint,
           403,
         );
       }
 
       if (response.status === 429) {
-        const retryAfterSeconds = Number(response.headers.get('retry-after') ?? 0);
-        const retryAfterMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
-          ? retryAfterSeconds * 1000
+        const retryAfterHeader = response.headers.get('retry-after');
+        const numericSeconds = Number(retryAfterHeader ?? 0);
+        let retryAfterMs = Number.isFinite(numericSeconds) && numericSeconds > 0
+          ? numericSeconds * 1000
           : 15 * 60 * 1000;
+
+        if (retryAfterHeader && !Number.isFinite(numericSeconds)) {
+          const retryDate = Date.parse(retryAfterHeader);
+          if (Number.isFinite(retryDate)) {
+            retryAfterMs = Math.max(1_000, retryDate - Date.now());
+          }
+        }
 
         return fail(
           'RATE_LIMITED',
           'Instagram rate-limited the scan. Progress was saved and WhoBack stopped immediately.',
-          checkpoint,
           429,
           retryAfterMs,
         );
@@ -268,159 +155,146 @@ export async function runInstagramMainWorldSync(
         return fail(
           'INSTAGRAM_UNAVAILABLE',
           `Instagram is temporarily unavailable (HTTP ${response.status}). Progress was saved.`,
-          checkpoint,
           response.status,
         );
       }
 
       return fail(
         'RELATIONSHIP_REQUEST_FAILED',
-        `Instagram rejected the relationship request (HTTP ${response.status}). Progress was saved.`,
-        checkpoint,
+        `Instagram rejected the request (HTTP ${response.status}). Progress was saved.`,
         response.status,
       );
     }
 
-    const text = await response.text();
-    if (!text.trim()) {
-      return fail('INVALID_RESPONSE', 'Instagram returned an empty response. Progress was saved.', checkpoint);
+    const body = await response.text();
+    if (!body.trim()) {
+      return fail('INVALID_RESPONSE', 'Instagram returned an empty response.');
     }
 
+    let data: Record<string, unknown>;
     try {
-      const data = JSON.parse(text) as Record<string, unknown>;
-      const status = data.status;
-      const message = String(data.message ?? '').toLowerCase();
-
-      if (
-        status === 'fail'
-        || data.spam === true
-        || data.checkpoint_url
-        || message.includes('please wait')
-        || message.includes('feedback_required')
-        || message.includes('checkpoint')
-      ) {
-        return fail(
-          message.includes('please wait') ? 'RATE_LIMITED' : 'REQUEST_BLOCKED',
-          'Instagram interrupted this scan. Progress was saved; wait before resuming.',
-          checkpoint,
-        );
-      }
-
-      return { ok: true, data };
+      data = JSON.parse(body) as Record<string, unknown>;
     } catch {
-      return fail(
-        'INVALID_RESPONSE',
-        'Instagram returned an unexpected response. Progress was saved.',
-        checkpoint,
-      );
-    }
-  };
-
-  const pace = async (completedPages: number) => {
-    if (completedPages > 0 && completedPages % 5 === 0) {
-      await sleep(20_000 + Math.floor(Math.random() * 3_000));
-      return;
+      return fail('INVALID_RESPONSE', 'Instagram returned an unexpected response.');
     }
 
-    await sleep(1_500 + Math.floor(Math.random() * 1_500));
-  };
-
-  const fetchRelationship = async (
-    type: 'followers' | 'following',
-  ): Promise<MainWorldSyncFailure | null> => {
-    const target = checkpoint[type];
-    if (target.done) return null;
-
-    checkpoint.phase = type;
-
-    for (
-      let page = target.pages + 1;
-      page <= MAX_PAGES_PER_LIST;
-      page += 1
+    const status = data.status;
+    const message = String(data.message ?? '').toLowerCase();
+    if (
+      status === 'fail'
+      || data.spam === true
+      || data.checkpoint_url
+      || message.includes('please wait')
+      || message.includes('feedback_required')
+      || message.includes('checkpoint')
     ) {
-      if (controller.signal.aborted) {
-        return fail('SYNC_ABORTED', 'The previous WhoBack scan was replaced by a newer scan.', checkpoint);
-      }
-
-      const currentCursor = target.cursor ?? '';
-      const params = new URLSearchParams({ count: '50' });
-      if (currentCursor) params.set('max_id', currentCursor);
-
-      const response = await request(
-        `/friendships/${encodeURIComponent(input.viewerId)}/${type}/?${params.toString()}`,
+      return fail(
+        message.includes('please wait') ? 'RATE_LIMITED' : 'REQUEST_BLOCKED',
+        'Instagram interrupted this scan. Progress was saved; wait before resuming.',
       );
-      if (!response.ok) return response;
-
-      const users = Array.isArray(response.data.users)
-        ? response.data.users as Array<Record<string, unknown>>
-        : [];
-
-      target.users = mergeUsers(target.users, users);
-      target.pages = page;
-
-      const nextRaw = response.data.next_max_id;
-      const next = nextRaw == null ? '' : String(nextRaw);
-
-      if (next && next === currentCursor) {
-        emitCheckpoint();
-        return fail(
-          'PAGINATION_STALLED',
-          `Instagram repeated the ${type} pagination cursor. Progress was saved.`,
-          checkpoint,
-        );
-      }
-
-      target.cursor = next || undefined;
-      target.done = !next;
-
-      emitCheckpoint();
-      emitProgress(type, target.users.length, target.pages);
-
-      if (target.done) return null;
-      await pace(target.pages);
     }
 
-    return fail(
-      'PAGINATION_STALLED',
-      `Instagram returned too many ${type} pages without completing. Progress was saved.`,
-      checkpoint,
-    );
+    return { ok: true, data };
   };
 
-  try {
-    if (!input.viewerId) {
-      return fail(
-        'SESSION_ID_MISSING',
-        'WhoBack could not read your Instagram session ID. Refresh Instagram and sign in again.',
-      );
-    }
+  const normalize = (value: unknown) =>
+    String(value ?? '').trim().replace(/^@/, '').toLowerCase();
 
-    const followingError = await fetchRelationship('following');
-    if (followingError) return followingError;
+  if (operation.kind === 'counts') {
+    const response = await request(
+      `/users/${encodeURIComponent(operation.viewerId)}/info/`,
+    );
+    if (!response.ok) return response;
 
-    const followersError = await fetchRelationship('followers');
-    if (followersError) return followersError;
+    const user = response.data.user && typeof response.data.user === 'object'
+      ? response.data.user as Record<string, unknown>
+      : {};
 
-    const username = normalize(input.expectedUsername)
-      || checkpoint.username
-      || 'instagram-user';
+    const followingRaw = Number(user.following_count);
+    const followersRaw = Number(user.follower_count);
 
     return {
       ok: true,
-      account: {
-        username,
-        platformUserId: input.viewerId,
-        detectedAt: Date.now(),
-      },
-      snapshot: {
-        capturedAt: Date.now(),
-        followers: uniqueUsernames(checkpoint.followers.users),
-        following: uniqueUsernames(checkpoint.following.users),
-      },
+      kind: 'counts',
+      durationMs: duration(),
+      followingTotal: Number.isFinite(followingRaw) ? Math.max(0, followingRaw) : null,
+      followersTotal: Number.isFinite(followersRaw) ? Math.max(0, followersRaw) : null,
     };
-  } finally {
-    if (runtimeScope.__WHOBACK_RUNTIME__?.scanId === scanId) {
-      delete runtimeScope.__WHOBACK_RUNTIME__;
-    }
   }
+
+  if (operation.kind === 'list-page') {
+    const params = new URLSearchParams({ count: '50' });
+    if (operation.cursor) params.set('max_id', operation.cursor);
+
+    const response = await request(
+      `/friendships/${encodeURIComponent(operation.viewerId)}/${operation.list}/?${params.toString()}`,
+    );
+    if (!response.ok) return response;
+
+    if (
+      response.data.should_limit_list_of_followers === true
+      || response.data.should_limit_list_of_followings === true
+    ) {
+      return fail(
+        'REQUEST_BLOCKED',
+        'Instagram returned an intentionally limited relationship list. Progress was saved.',
+      );
+    }
+
+    const rawUsers = Array.isArray(response.data.users)
+      ? response.data.users as Array<Record<string, unknown>>
+      : [];
+
+    const users: InstagramUserRef[] = [];
+    for (const raw of rawUsers) {
+      const idRaw = raw.pk ?? raw.id;
+      const id = idRaw == null ? '' : String(idRaw);
+      const username = normalize(raw.username);
+      if (!id || !username) continue;
+      users.push({ id, username });
+    }
+
+    const nextRaw = response.data.next_max_id;
+    const nextCursor = nextRaw == null ? '' : String(nextRaw);
+    const hasMore = response.data.has_more;
+    const done = hasMore === false || !nextCursor;
+
+    if (!done && users.length === 0) {
+      return fail('PAGINATION_STALLED', 'Instagram returned an empty page with more pages remaining.');
+    }
+
+    return {
+      ok: true,
+      kind: 'list-page',
+      durationMs: duration(),
+      users,
+      ...(nextCursor ? { nextCursor } : {}),
+      done,
+      rawCount: rawUsers.length,
+    };
+  }
+
+  const response = await request(
+    `/friendships/show/${encodeURIComponent(operation.targetUserId)}/`,
+  );
+  if (!response.ok) return response;
+
+  if (
+    typeof response.data.followed_by !== 'boolean'
+    || typeof response.data.following !== 'boolean'
+  ) {
+    return fail(
+      'INVALID_RESPONSE',
+      'Instagram returned an incomplete relationship response.',
+    );
+  }
+
+  return {
+    ok: true,
+    kind: 'relationship',
+    durationMs: duration(),
+    targetUserId: operation.targetUserId,
+    followedBy: response.data.followed_by,
+    following: response.data.following,
+  };
 }

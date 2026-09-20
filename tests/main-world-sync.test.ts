@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ScanCheckpoint } from '../src/domain/types';
-import { runInstagramMainWorldSync } from '../src/instagram/main-world-sync';
+import { runInstagramOperation } from '../src/instagram/main-world-sync';
 
 const originalFetch = globalThis.fetch;
 
@@ -17,129 +16,103 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('runInstagramMainWorldSync', () => {
-  it('starts directly from the known viewer id without identity network calls', async () => {
+describe('runInstagramOperation', () => {
+  it('reads profile counts with one request', async () => {
     const calls: string[] = [];
-
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      calls.push(url);
-
-      if (url.includes('/friendships/123/following/')) {
-        return jsonResponse({
-          status: 'ok',
-          users: [
-            { pk: '1', username: 'ALICE' },
-            { pk: '4', username: 'Dave' },
-          ],
-        });
-      }
-
-      if (url.includes('/friendships/123/followers/')) {
-        return jsonResponse({
-          status: 'ok',
-          users: [
-            { pk: '1', username: 'Alice' },
-            { pk: '2', username: 'BOB' },
-            { pk: '3', username: 'alice' },
-          ],
-        });
-      }
-
-      throw new Error(`Unexpected URL: ${url}`);
+      calls.push(String(input));
+      return jsonResponse({
+        status: 'ok',
+        user: {
+          following_count: 123,
+          follower_count: 1_000_000,
+        },
+      });
     }) as typeof fetch;
 
-    const result = await runInstagramMainWorldSync({
-      viewerId: '123',
-      expectedUsername: 'mraulabsr',
+    const result = await runInstagramOperation({
+      kind: 'counts',
+      viewerId: '42',
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    expect(result.account).toMatchObject({
-      username: 'mraulabsr',
-      platformUserId: '123',
+    expect(result).toMatchObject({
+      ok: true,
+      kind: 'counts',
+      followingTotal: 123,
+      followersTotal: 1_000_000,
     });
-    expect(result.snapshot.followers).toEqual(['alice', 'bob']);
-    expect(result.snapshot.following).toEqual(['alice', 'dave']);
+    expect(calls).toEqual(['/api/v1/users/42/info/']);
+  });
+
+  it('fetches exactly one relationship-list page', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return jsonResponse({
+        status: 'ok',
+        users: [
+          { pk: '1', username: 'ALICE' },
+          { pk: '2', username: 'Bob' },
+        ],
+        next_max_id: 'page-two',
+        has_more: true,
+      });
+    }) as typeof fetch;
+
+    const result = await runInstagramOperation({
+      kind: 'list-page',
+      viewerId: '42',
+      list: 'following',
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      kind: 'list-page',
+      users: [
+        { id: '1', username: 'alice' },
+        { id: '2', username: 'bob' },
+      ],
+      nextCursor: 'page-two',
+      done: false,
+      rawCount: 2,
+    });
     expect(calls).toEqual([
-      '/api/v1/friendships/123/following/?count=50',
-      '/api/v1/friendships/123/followers/?count=50',
+      '/api/v1/friendships/42/following/?count=50',
     ]);
-    expect(calls.some((url) => url.includes('web_profile_info'))).toBe(false);
-    expect(calls.some((url) => url.includes('web_form_data'))).toBe(false);
   });
 
-  it('resumes from the saved cursor instead of restarting completed pages', async () => {
-    const calls: string[] = [];
-    const checkpoint: ScanCheckpoint = {
-      version: 1,
-      accountId: '123',
-      username: 'mraulabsr',
-      phase: 'following',
-      following: {
-        users: [{ id: '1', username: 'alice' }],
-        cursor: 'page-two',
-        done: false,
-        pages: 1,
-      },
-      followers: {
-        users: [],
-        done: false,
-        pages: 0,
-      },
-      requestCount: 1,
-      startedAt: 100,
-      updatedAt: 200,
-    };
+  it('checks one follow-back relationship', async () => {
+    globalThis.fetch = vi.fn(async () => jsonResponse({
+      status: 'ok',
+      followed_by: false,
+      following: true,
+    })) as typeof fetch;
 
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      calls.push(url);
-
-      if (url.includes('/following/')) {
-        return jsonResponse({
-          status: 'ok',
-          users: [{ pk: '2', username: 'bob' }],
-        });
-      }
-
-      if (url.includes('/followers/')) {
-        return jsonResponse({
-          status: 'ok',
-          users: [{ pk: '1', username: 'alice' }],
-        });
-      }
-
-      throw new Error(`Unexpected URL: ${url}`);
-    }) as typeof fetch;
-
-    const result = await runInstagramMainWorldSync({
-      viewerId: '123',
-      expectedUsername: 'mraulabsr',
-      checkpoint,
+    const result = await runInstagramOperation({
+      kind: 'relationship',
+      viewerId: '42',
+      targetUserId: '99',
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    expect(result.snapshot.following).toEqual(['alice', 'bob']);
-    expect(calls[0]).toContain('/following/?count=50&max_id=page-two');
-    expect(calls.filter((url) => url.includes('/following/'))).toHaveLength(1);
+    expect(result).toMatchObject({
+      ok: true,
+      kind: 'relationship',
+      targetUserId: '99',
+      followedBy: false,
+      following: true,
+    });
   });
 
-  it('hard-stops on 429 and returns a resumable checkpoint', async () => {
-    vi.spyOn(Date, 'now').mockReturnValue(1_000);
-
+  it('hard-stops on 429 and honors Retry-After seconds', async () => {
     globalThis.fetch = vi.fn(async () => new Response('', {
       status: 429,
       headers: { 'retry-after': '120' },
     })) as typeof fetch;
 
-    const result = await runInstagramMainWorldSync({
-      viewerId: '123',
-      expectedUsername: 'mraulabsr',
+    const result = await runInstagramOperation({
+      kind: 'list-page',
+      viewerId: '42',
+      list: 'following',
     });
 
     expect(result.ok).toBe(false);
@@ -151,36 +124,21 @@ describe('runInstagramMainWorldSync', () => {
       status: 429,
       retryAfterMs: 120_000,
     });
-    expect(result.checkpoint).toMatchObject({
-      version: 1,
-      accountId: '123',
-      phase: 'following',
-      requestCount: 1,
-      following: {
-        users: [],
-        done: false,
-        pages: 0,
-      },
-    });
   });
 
-  it('maps a browser-level fetch failure and keeps the checkpoint', async () => {
+  it('maps a browser-level fetch failure', async () => {
     globalThis.fetch = vi.fn(async () => {
       throw new TypeError('Failed to fetch');
     }) as typeof fetch;
 
-    const result = await runInstagramMainWorldSync({
-      viewerId: '123',
-      expectedUsername: 'mraulabsr',
+    const result = await runInstagramOperation({
+      kind: 'counts',
+      viewerId: '42',
     });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
-    expect(result.error).toEqual({
-      code: 'NETWORK_ERROR',
-      message: 'Instagram request failed inside the signed-in page. Reload Instagram and try again.',
-    });
-    expect(result.checkpoint?.accountId).toBe('123');
+    expect(result.error.code).toBe('NETWORK_ERROR');
   });
 });
