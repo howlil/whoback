@@ -10,17 +10,23 @@
     "prepare": "wxt prepare",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "site:dev": "astro dev website",
+    "site:build": "astro build website",
+    "site:preview": "astro preview website"
   },
   "dependencies": {
+    "motion": "latest",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@astrojs/react": "latest",
     "@tailwindcss/vite": "4.3.3",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "6.1.1",
+    "astro": "latest",
     "tailwindcss": "4.3.3",
     "typescript": "latest",
     "vite": "8.3.0",
