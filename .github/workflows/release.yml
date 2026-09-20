@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - package.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: whoback-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check existing release
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists; nothing to publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.existing.outputs.exists != 'true'
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck
+        if: steps.existing.outputs.exists != 'true'
+        run: pnpm typecheck
+
+      - name: Test
+        if: steps.existing.outputs.exists != 'true'
+        run: pnpm test
+
+      - name: Build
+        if: steps.existing.outputs.exists != 'true'
+        run: pnpm build
+
+      - name: Package extension
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          pnpm zip
+
+          ASSET="$(find .output -maxdepth 1 -type f -name '*chrome*.zip' | head -n 1)"
+          if [ -z "$ASSET" ]; then
+            ASSET="$(find .output -maxdepth 1 -type f -name '*.zip' | head -n 1)"
+          fi
+
+          if [ -z "$ASSET" ]; then
+            echo "No extension ZIP was produced by WXT."
+            exit 1
+          fi
+
+          cp "$ASSET" "whoback-chrome-$TAG.zip"
+          sha256sum "whoback-chrome-$TAG.zip" > SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          cat > release-notes.md <<EOF
+          ## WhoBack $TAG
+
+          First public WhoBack release.
+
+          ### What you can do
+          - See accounts that do not follow you back.
+          - See accounts you do not follow back.
+          - See mutual followers.
+          - Track new followers and unfollowers across completed scans.
+          - Resume interrupted scans without restarting from page 1.
+
+          ### Install
+          1. Download `whoback-chrome-$TAG.zip` from Assets below.
+          2. Extract the ZIP.
+          3. Open `chrome://extensions`.
+          4. Enable **Developer mode**.
+          5. Click **Load unpacked**.
+          6. Select the extracted folder containing `manifest.json`.
+
+          ### Privacy
+          WhoBack runs locally, does not ask for your Instagram password, and has no application backend.
+
+          ### Important
+          WhoBack depends on undocumented Instagram Web endpoints. Instagram can change or rate-limit these endpoints at any time.
+          EOF
+
+          gh release create "$TAG"             "whoback-chrome-$TAG.zip"             "SHA256SUMS.txt"             --target "$GITHUB_SHA"             --title "WhoBack $TAG"             --notes-file release-notes.md
