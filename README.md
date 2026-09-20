@@ -4,7 +4,7 @@
 
 WhoBack berjalan sebagai Chrome extension dan menggunakan sesi Instagram yang **sudah login di browser kamu**.
 
-> **Status:** early beta. WhoBack belum tersedia di Chrome Web Store dan saat ini belum memiliki installer publik untuk pengguna biasa.
+> **Current release:** **v1.0.0**. WhoBack belum tersedia di Chrome Web Store, tetapi versi siap install tersedia melalui [GitHub Releases](https://github.com/howlil/whoback/releases/latest).
 
 ---
 
@@ -125,19 +125,21 @@ WhoBack akan berhenti otomatis saat mendeteksi rate limit agar tidak terus mengi
 
 ### Untuk pengguna biasa
 
-Saat ini WhoBack **belum memiliki installer publik atau Chrome Web Store release**.
+1. Buka **[Latest Release](https://github.com/howlil/whoback/releases/latest)**.
+2. Di bagian **Assets**, download file:
+   ```text
+   whoback-chrome-v1.0.0.zip
+   ```
+3. Extract ZIP tersebut ke folder biasa.
+4. Buka Chrome dan ketik `chrome://extensions` di address bar.
+5. Aktifkan **Developer mode** di kanan atas.
+6. Klik **Load unpacked**.
+7. Pilih folder hasil extract yang berisi `manifest.json`.
+8. Pin icon WhoBack dari menu Extensions agar mudah dibuka.
 
-Jika kamu menerima folder build WhoBack dari pengembang:
+Kalau ada versi baru, download release terbaru dan load folder build terbaru.
 
-1. Extract folder ZIP jika masih berbentuk ZIP.
-2. Buka Chrome.
-3. Ketik `chrome://extensions` di address bar.
-4. Aktifkan **Developer mode** di kanan atas.
-5. Klik **Load unpacked**.
-6. Pilih folder build WhoBack, biasanya bernama `chrome-mv3`.
-7. Pin icon WhoBack dari menu Extensions agar mudah dibuka.
-
-> **Jangan menggunakan tombol GitHub “Code → Download ZIP” sebagai installer.** File tersebut adalah source code, bukan extension siap pakai.
+> **Jangan gunakan tombol GitHub “Code → Download ZIP”.** Itu adalah source code. Installer manual WhoBack selalu tersedia di bagian **Assets** pada GitHub Release.
 
 ---
 
