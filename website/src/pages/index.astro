@@ -5,18 +5,6 @@ import { ProductPreview } from '../components/ProductPreview';
 
 const releaseUrl = 'https://github.com/howlil/whoback/releases/latest';
 const repoUrl = 'https://github.com/howlil/whoback';
-
-const outcomes = [
-  ["Don't follow you back", 'See people you follow who do not follow you back.'],
-  ['Mutual', 'See the people who follow you back.'],
-  ["You don't follow back", 'Available when a full follower scan is completed.'],
-];
-
-const steps = [
-  ['Open Instagram', 'Stay signed in to instagram.com in Chrome.'],
-  ['Run WhoBack', 'The extension reads relationship data from that browser session.'],
-  ['Inspect the result', 'Review mutuals, one-way follows, and saved scan progress.'],
-];
 ---
 
 <BaseLayout>
@@ -60,45 +48,162 @@ const steps = [
       </div>
     </section>
 
-    <section class="proof-strip">
-      <div class="page-shell proof-strip__inner">
-        <div><strong>No password form</strong><span>Uses your existing Instagram session.</span></div>
-        <div><strong>No WhoBack backend</strong><span>Results and checkpoints stay local.</span></div>
-        <div><strong>No restart from page one</strong><span>Recoverable interruptions can resume.</span></div>
-      </div>
-    </section>
-
-    <section id="product" class="content-section">
-      <div class="page-shell split-section">
-        <div>
-          <p class="section-kicker">What it answers</p>
-          <h2>Three relationship views. No social-media dashboard theater.</h2>
-        </div>
-        <div class="list-board">
-          {outcomes.map(([title, body], index) => (
-            <article>
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <div><h3>{title}</h3><p>{body}</p></div>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-
-    <section id="how" class="content-section content-section--muted">
+    <section id="product" class="feature-showcase-section">
       <div class="page-shell">
-        <div class="section-heading">
-          <p class="section-kicker">How it works</p>
-          <h2>Open Instagram. Run the check. Read the result.</h2>
+        <div class="showcase-heading">
+          <p class="section-kicker">Product features</p>
+          <h2>The relationship views that matter.</h2>
+          <p>See one-way follows, mutuals, and recoverable scan progress without checking profiles one by one.</p>
         </div>
-        <div class="steps-grid">
-          {steps.map(([title, body], index) => (
-            <article>
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <h3>{title}</h3>
-              <p>{body}</p>
+
+        <div class="feature-board">
+          <article class="feature-tile feature-tile--not-back">
+            <div class="feature-tile__eyebrow">
+              <span class="feature-dot feature-dot--danger"></span>
+              Primary view
+            </div>
+
+            <div class="feature-list-preview" aria-hidden="true">
+              <div class="feature-user-row">
+                <span class="feature-avatar">A</span>
+                <span><strong>@alex</strong><small>Following</small></span>
+                <em>Not back</em>
+              </div>
+              <div class="feature-user-row">
+                <span class="feature-avatar">N</span>
+                <span><strong>@nara</strong><small>Following</small></span>
+                <em>Not back</em>
+              </div>
+              <div class="feature-user-row feature-user-row--muted">
+                <span class="feature-avatar">M</span>
+                <span><strong>@mika</strong><small>Following</small></span>
+                <em>Not back</em>
+              </div>
+            </div>
+
+            <div class="feature-tile__copy">
+              <h3>Don&apos;t follow you back</h3>
+              <p>People you follow who do not follow you back.</p>
+            </div>
+          </article>
+
+          <div class="feature-stack">
+            <article class="feature-tile feature-tile--mutual">
+              <div class="feature-tile__eyebrow">
+                <span class="feature-dot feature-dot--positive"></span>
+                Mutual
+              </div>
+              <div class="feature-stat feature-stat--positive">603</div>
+              <p>People you follow who follow you back.</p>
             </article>
-          ))}
+
+            <article class="feature-tile feature-tile--resume">
+              <div class="resume-status">
+                <span class="resume-icon">↻</span>
+                <div><strong>Progress saved</strong><small>616 following scanned</small></div>
+              </div>
+              <div class="resume-bar"><span></span></div>
+              <div class="feature-tile__copy">
+                <h3>Resume scan</h3>
+                <p>Interrupted scans continue from saved progress instead of starting over.</p>
+              </div>
+            </article>
+          </div>
+
+          <article class="feature-tile feature-tile--fans">
+            <div class="feature-tile__eyebrow">
+              <span class="feature-dot feature-dot--warn"></span>
+              Full scan
+            </div>
+            <div>
+              <div class="feature-stat feature-stat--warn">828</div>
+              <div class="feature-stat-caption">accounts</div>
+            </div>
+            <div class="feature-tile__copy">
+              <h3>You don&apos;t follow back</h3>
+              <p>Accounts that follow you while staying outside your following list.</p>
+              <small>Available after a full follower scan.</small>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="workflow-section">
+      <div class="page-shell">
+        <div class="workflow-heading">
+          <p class="section-kicker">How it works</p>
+          <h2>Check your follow relationships in <mark>3 simple steps</mark></h2>
+          <p>Keep Instagram signed in, run WhoBack, then inspect the relationship result.</p>
+        </div>
+
+        <div class="workflow-cards">
+          <div class="workflow-step-label workflow-step-label--one">
+            <span>Step 1</span>
+            <svg viewBox="0 0 58 34" aria-hidden="true">
+              <path d="M2 4c27 0 38 5 39 24m0 0-5-6m5 6 5-5" />
+            </svg>
+          </div>
+
+          <article class="workflow-card">
+            <div class="workflow-visual workflow-visual--instagram">
+              <div class="browser-mini">
+                <div class="browser-mini__bar"><span></span><span></span><span></span><b>instagram.com</b></div>
+                <div class="browser-mini__body">
+                  <div class="ig-avatar">Y</div>
+                  <div><strong>@youraccount</strong><small>Signed in</small></div>
+                  <span class="connected-pill">Connected</span>
+                </div>
+              </div>
+            </div>
+            <div class="workflow-card__copy">
+              <h3>Open Instagram</h3>
+              <p>Stay signed in to instagram.com in Chrome. WhoBack uses that existing browser session.</p>
+            </div>
+          </article>
+
+          <div class="workflow-step-label workflow-step-label--two">
+            <span>Step 2</span>
+            <svg viewBox="0 0 58 34" aria-hidden="true">
+              <path d="M56 30c-27 0-38-5-39-24m0 0 5 6m-5-6-5 5" />
+            </svg>
+          </div>
+
+          <article class="workflow-card">
+            <div class="workflow-visual workflow-visual--scan">
+              <div class="scan-mini">
+                <div class="scan-mini__header"><strong>WhoBack</strong><span>Scanning</span></div>
+                <div class="scan-mini__row"><span>Following</span><strong>616</strong></div>
+                <div class="scan-mini__progress"><span></span></div>
+                <button type="button" tabindex="-1">Check now</button>
+              </div>
+            </div>
+            <div class="workflow-card__copy">
+              <h3>Run WhoBack</h3>
+              <p>Open the extension and start a check. Progress is saved while the scan runs.</p>
+            </div>
+          </article>
+
+          <div class="workflow-step-label workflow-step-label--three">
+            <span>Step 3</span>
+            <svg viewBox="0 0 58 34" aria-hidden="true">
+              <path d="M56 4c-27 0-38 5-39 24m0 0 5-6m-5 6-5-5" />
+            </svg>
+          </div>
+
+          <article class="workflow-card">
+            <div class="workflow-visual workflow-visual--result">
+              <div class="result-mini">
+                <div><span>Mutual</span><strong class="result-mini__positive">603</strong></div>
+                <div><span>Don&apos;t follow back</span><strong class="result-mini__danger">13</strong></div>
+                <div><span>You don&apos;t follow back</span><strong class="result-mini__warn">828</strong></div>
+              </div>
+            </div>
+            <div class="workflow-card__copy">
+              <h3>View the result</h3>
+              <p>Inspect mutuals and one-way follows without checking Instagram profiles individually.</p>
+            </div>
+          </article>
         </div>
       </div>
     </section>
