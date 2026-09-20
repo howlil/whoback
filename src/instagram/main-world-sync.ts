@@ -31,7 +31,7 @@ export type MainWorldSyncResult = MainWorldSyncSuccess | MainWorldSyncFailure;
  * no imports, module constants, or helpers referenced from outside the function.
  */
 export async function runInstagramMainWorldSync(
-  expectedUsername?: string,
+  expectedUsername?: string | null,
 ): Promise<MainWorldSyncResult> {
   const API_BASE = '/api/v1';
   const IG_APP_ID = '936619743392459';
