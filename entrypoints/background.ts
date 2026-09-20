@@ -9,6 +9,7 @@ import type {
 } from '../src/domain/types';
 import { isInstagramUsername } from '../src/instagram/profile-identity';
 import { resolveInstagramViewerId } from '../src/instagram/session-identity';
+import { planRelationshipScan } from '../src/instagram/scan-planner';
 import {
   runInstagramOperation,
   type InstagramOperation,
@@ -27,7 +28,6 @@ import {
 const ALARM = 'whoback-auto-sync';
 const INSTAGRAM_URL = 'https://www.instagram.com/';
 const MAX_LIST_PAGES = 10_000;
-const OBSERVED_FOLLOWER_PAGE_SIZE = 24;
 const CHECKPOINT_EVERY_REQUESTS = 5;
 
 let activeRunId: string | null = null;
@@ -308,7 +308,23 @@ async function runAdaptiveSync(
       return;
     }
 
-    checkpoint.strategy = chooseStrategy(checkpoint, following.size, followers.size);
+    const mutualIds = new Set(followers.keys());
+    let unresolvedFollowing = 0;
+    for (const user of following.values()) {
+      if (
+        !mutualIds.has(user.id)
+        && typeof checkpoint.verified[user.id] !== 'boolean'
+      ) {
+        unresolvedFollowing += 1;
+      }
+    }
+
+    const plan = planRelationshipScan({
+      followersTotal: checkpoint.followersTotal,
+      loadedFollowers: followers.size,
+      unresolvedFollowing,
+    });
+    checkpoint.strategy = checkpoint.strategy ?? plan.strategy;
     checkpoint.telemetry.strategy = checkpoint.strategy;
     await persistCheckpoint(checkpoint);
 
@@ -548,42 +564,6 @@ async function verifyFollowing(
   checkpoint.following.users = [...following.values()];
   await persistCheckpoint(checkpoint);
   return true;
-}
-
-function chooseStrategy(
-  checkpoint: ScanCheckpoint,
-  followingCount: number,
-  loadedFollowers: number,
-): ScanStrategy {
-  if (checkpoint.strategy) return checkpoint.strategy;
-
-  if (checkpoint.followersTotal == null) {
-    return 'full-lists';
-  }
-
-  const remainingFollowers = Math.max(
-    0,
-    checkpoint.followersTotal - loadedFollowers,
-  );
-  const estimatedFollowerPages = Math.ceil(
-    remainingFollowers / OBSERVED_FOLLOWER_PAGE_SIZE,
-  );
-
-  const mutualIds = new Set(checkpoint.followers.users.map((user) => user.id));
-  let unresolvedFollowing = 0;
-  for (const user of checkpoint.following.users) {
-    if (
-      !mutualIds.has(user.id)
-      && typeof checkpoint.verified[user.id] !== 'boolean'
-    ) {
-      unresolvedFollowing += 1;
-    }
-  }
-
-  if (followingCount === 0) return 'verify-following';
-  return unresolvedFollowing <= estimatedFollowerPages
-    ? 'verify-following'
-    : 'full-lists';
 }
 
 function recordOperation(
