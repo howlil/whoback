@@ -123,6 +123,7 @@ function Popup() {
   const changes = latest ? diffSnapshots(previous, latest) : null;
   const checkpoint = state.scanCheckpoint;
   const resumable = Boolean(checkpoint);
+  const paused = state.sync.phase === 'paused';
   const busy = ['starting', 'planning', 'followers', 'following', 'verifying', 'processing'].includes(state.sync.phase);
   const cooldownActive = Boolean(state.sync.cooldownUntil && state.sync.cooldownUntil > Date.now());
   const cooldownMinutes = cooldownActive
@@ -150,6 +151,7 @@ function Popup() {
   };
 
   const startSync = () => browser.runtime.sendMessage({ type: 'START_SYNC' } satisfies WhoBackMessage);
+  const restartSync = () => browser.runtime.sendMessage({ type: 'RESTART_SYNC' } satisfies WhoBackMessage);
 
   return <main className="w-[360px] bg-canvas p-3 text-ink">
     <section className="surface overflow-hidden rounded-2xl">
@@ -188,7 +190,7 @@ function Popup() {
         <div className="p-4">
           <div className="flex items-center gap-3">
             <Avatar username={state.account.username} src={state.account.avatarUrl} />
-            <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold">@{state.account.username}</div><div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted"><span className="size-1.5 rounded-full bg-emerald-500"/>Connected</div></div>
+            <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold">@{state.account.username}</div><div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted"><span className={`size-1.5 rounded-full ${paused ? 'bg-amber-500' : 'bg-emerald-500'}`}/>{paused ? 'Scan paused' : 'Connected'}</div></div>
             <button aria-label={resumable ? 'Resume scan' : 'Sync now'} disabled={busy || cooldownActive} className="focus-ring rounded-lg border border-line p-2 text-muted hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40" onClick={startSync}><RefreshIcon className={`size-4 ${busy ? 'animate-spin' : ''}`} /></button>
           </div>
 
@@ -197,13 +199,29 @@ function Popup() {
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-brand transition-[width]" style={{ width: `${state.sync.progress}%` }} /></div>
           </div>}
 
-          {state.sync.phase === 'error' && <div className="mt-4 rounded-xl bg-danger-soft p-3 text-xs leading-5 text-danger">
-            {state.sync.message}
-            {checkpoint && <div className="mt-1 text-danger/80">Saved: {checkpoint.following.users.length.toLocaleString()} following · {checkpoint.followers.users.length.toLocaleString()} followers.</div>}
-            {cooldownActive && <div className="mt-1 font-semibold">Resume available in ~{cooldownMinutes} min.</div>}
+          {paused && <div className="mt-4 rounded-xl bg-warn-soft p-3 text-xs leading-5 text-warn">
+            <div className="font-semibold">Scan paused — your progress is safe.</div>
+            <div className="mt-1">{state.sync.message}</div>
+            {checkpoint && <div className="mt-1 opacity-80">Saved: {checkpoint.following.users.length.toLocaleString()} following · {checkpoint.followers.users.length.toLocaleString()} followers.</div>}
+            {latest && <div className="mt-1 opacity-80">Your last successful results are still available below.</div>}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button className="focus-ring rounded-lg bg-[#17143f] px-3 py-2 font-semibold text-white" onClick={startSync}>Resume scan</button>
+              <button className="focus-ring rounded-lg border border-current/20 bg-white/60 px-3 py-2 font-semibold" onClick={restartSync}>Start over</button>
+            </div>
           </div>}
 
-          {checkpoint && !busy && state.sync.phase !== 'error' && <div className="mt-4 rounded-xl bg-brand-soft p-3 text-xs leading-5 text-brand">
+          {state.sync.phase === 'error' && <div className="mt-4 rounded-xl bg-danger-soft p-3 text-xs leading-5 text-danger">
+            <div className="font-semibold">Scan needs attention.</div>
+            <div className="mt-1">{state.sync.message}</div>
+            {checkpoint && <div className="mt-1 text-danger/80">Saved: {checkpoint.following.users.length.toLocaleString()} following · {checkpoint.followers.users.length.toLocaleString()} followers.</div>}
+            {cooldownActive && <div className="mt-1 font-semibold">Resume available in ~{cooldownMinutes} min.</div>}
+            {checkpoint && !cooldownActive && <div className="mt-3 grid grid-cols-2 gap-2">
+              <button className="focus-ring rounded-lg bg-[#17143f] px-3 py-2 font-semibold text-white" onClick={startSync}>Resume scan</button>
+              <button className="focus-ring rounded-lg border border-danger/20 bg-white/60 px-3 py-2 font-semibold" onClick={restartSync}>Start over</button>
+            </div>}
+          </div>}
+
+          {checkpoint && !busy && state.sync.phase !== 'error' && state.sync.phase !== 'paused' && <div className="mt-4 rounded-xl bg-brand-soft p-3 text-xs leading-5 text-brand">
             Saved scan progress: {checkpoint.following.users.length.toLocaleString()} following · {checkpoint.followers.users.length.toLocaleString()} followers.
           </div>}
 
@@ -211,9 +229,9 @@ function Popup() {
             <div className="mt-4 grid grid-cols-2 gap-2"><MetricCard value={analysis.followersCount} label="Followers"/><MetricCard value={analysis.followingCount} label="Following"/><MetricCard value={analysis.mutual.length} label="Mutual" tone="positive"/><MetricCard value={analysis.notFollowingBack.length} label="Don't follow you back" tone="danger"/><MetricCard value={analysis.youDontFollowBack.length} label="You don't follow back" tone="warn"/></div>
             {changes && previous && changes.followersComplete && <div className="mt-3 flex gap-2 text-[11px]"><span className="rounded-full bg-positive-soft px-2 py-1 font-medium text-positive">+{changes.newFollowers.length} new</span><span className="rounded-full bg-danger-soft px-2 py-1 font-medium text-danger">−{changes.unfollowers.length} unfollowed</span></div>}
             <button className="focus-ring mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#17143f] px-4 py-3 text-sm font-semibold text-white hover:bg-[#211d55]" onClick={openSidePanel}>View details <ArrowIcon className="size-4" /></button>
-          </> : !busy && <div className="mt-4 rounded-xl border border-dashed border-line p-4 text-center"><p className="text-sm font-medium">Ready for your first check</p><p className="mt-1 text-xs leading-5 text-muted">WhoBack reads followers and following through your existing Instagram session.</p><button disabled={cooldownActive} className="focus-ring mt-3 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40" onClick={startSync}>{cooldownActive ? `Resume in ~${cooldownMinutes} min` : resumable ? 'Resume scan' : 'Check now'}</button></div>}
+          </> : !busy && !paused && state.sync.phase !== 'error' && <div className="mt-4 rounded-xl border border-dashed border-line p-4 text-center"><p className="text-sm font-medium">Ready for your first check</p><p className="mt-1 text-xs leading-5 text-muted">WhoBack reads followers and following through your existing Instagram session.</p><button disabled={cooldownActive} className="focus-ring mt-3 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40" onClick={startSync}>{cooldownActive ? `Resume in ~${cooldownMinutes} min` : resumable ? 'Resume scan' : 'Check now'}</button></div>}
 
-          {latest && <p className="mt-3 text-center text-[10px] text-muted">Last checked {new Date(latest.capturedAt).toLocaleString()}</p>}
+          {latest && <p className="mt-3 text-center text-[10px] text-muted">Last successful check {new Date(latest.capturedAt).toLocaleString()}</p>}
         </div>
       )}
     </section>

@@ -10,6 +10,7 @@ import type {
 import { isInstagramUsername } from '../src/instagram/profile-identity';
 import { resolveInstagramViewerId } from '../src/instagram/session-identity';
 import { planRelationshipScan } from '../src/instagram/scan-planner';
+import { planFollowingCountRecovery } from '../src/instagram/scan-recovery';
 import {
   runInstagramOperation,
   type InstagramOperation,
@@ -169,11 +170,11 @@ async function startSync(username?: string) {
     });
   }
 
-  const tab = await findInstagramTab();
+  const tab = await getOrOpenInstagramTab();
   if (!tab?.id) {
-    await setSyncError(
+    await setSyncPaused(
       'NO_INSTAGRAM_TAB',
-      'Open instagram.com in this browser, then run WhoBack again.',
+      'Instagram needs to be open to continue. Your scan progress is safe.',
     );
     return;
   }
@@ -233,7 +234,7 @@ async function runAdaptiveSync(
       recordOperation(checkpoint, counts);
 
       if (!counts.ok) {
-        if (isHardStop(counts)) {
+        if (isHardStop(counts) || isRecoverablePause(counts)) {
           await finishFailure(counts, checkpoint);
           return;
         }
@@ -308,14 +309,23 @@ async function runAdaptiveSync(
       return;
     }
 
-    if (
-      checkpoint.followingTotal != null
-      && following.size < checkpoint.followingTotal
-    ) {
+    const followingRecovery = planFollowingCountRecovery(
+      following.size,
+      checkpoint.followingTotal,
+      checkpoint.followingRetryCount ?? 0,
+    );
+
+    checkpoint.telemetry.followingCountGap = followingRecovery.gap;
+
+    if (followingRecovery.action === 'retry') {
+      checkpoint.followingRetryCount = (checkpoint.followingRetryCount ?? 0) + 1;
+      checkpoint.following.done = false;
+      checkpoint.following.cursor = undefined;
+      checkpoint.following.pages = 0;
       await persistMaps(checkpoint, following, followers);
-      await setSyncError(
-        'REQUEST_BLOCKED',
-        `Instagram returned an incomplete following list (${following.size.toLocaleString()} / ${checkpoint.followingTotal.toLocaleString()}). Progress was saved.`,
+      await setSyncPaused(
+        'PAGINATION_STALLED',
+        `Instagram returned ${following.size.toLocaleString()} of ${checkpoint.followingTotal?.toLocaleString() ?? 'the expected'} following accounts. Progress is safe; Resume will reconcile this section once.`,
       );
       return;
     }
@@ -365,6 +375,7 @@ async function runAdaptiveSync(
         checkpoint.followersTotal != null
         && followers.size < checkpoint.followersTotal
       ) {
+        checkpoint.telemetry.followersCountGap = checkpoint.followersTotal - followers.size;
         checkpoint.strategy = 'verify-following';
         checkpoint.telemetry.strategy = 'verify-following';
         const verified = await verifyFollowing(
@@ -668,11 +679,24 @@ function isHardStop(result: InstagramOperationFailure) {
   ].includes(result.error.code);
 }
 
+function isRecoverablePause(result: InstagramOperationFailure) {
+  return [
+    'NO_INSTAGRAM_TAB',
+    'INJECTION_FAILED',
+    'NETWORK_ERROR',
+  ].includes(result.error.code);
+}
+
 async function finishFailure(
   result: InstagramOperationFailure,
   checkpoint: ScanCheckpoint,
 ) {
   await persistCheckpoint(checkpoint);
+
+  if (isRecoverablePause(result)) {
+    await setSyncPaused(result.error.code, result.error.message);
+    return;
+  }
 
   const shouldCoolDown = result.error.code === 'RATE_LIMITED'
     || result.error.code === 'REQUEST_BLOCKED';
@@ -735,6 +759,20 @@ async function findInstagramTab() {
   return [...tabs].sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)))[0];
 }
 
+async function getOrOpenInstagramTab() {
+  const existing = await findInstagramTab();
+  if (existing?.id) return existing;
+
+  try {
+    const created = await browser.tabs.create({ url: INSTAGRAM_URL, active: true });
+    if (!created.id) return created;
+    await waitForTabComplete(created.id, 15_000);
+    return browser.tabs.get(created.id);
+  } catch {
+    return undefined;
+  }
+}
+
 async function executeOperation(
   tabId: number,
   operation: InstagramOperation,
@@ -742,9 +780,33 @@ async function executeOperation(
   try {
     return await injectOperation(tabId, operation);
   } catch {
-    await browser.tabs.reload(tabId);
-    await waitForTabComplete(tabId, 15_000);
-    return injectOperation(tabId, operation);
+    try {
+      await browser.tabs.get(tabId);
+    } catch {
+      return {
+        ok: false,
+        durationMs: 0,
+        error: {
+          code: 'NO_INSTAGRAM_TAB',
+          message: 'Instagram was closed. Your scan progress is safe — resume when you are ready.',
+        },
+      };
+    }
+
+    try {
+      await browser.tabs.reload(tabId);
+      await waitForTabComplete(tabId, 15_000);
+      return await injectOperation(tabId, operation);
+    } catch {
+      return {
+        ok: false,
+        durationMs: 0,
+        error: {
+          code: 'INJECTION_FAILED',
+          message: 'Instagram changed or reloaded while WhoBack was scanning. Your progress is safe — resume to continue.',
+        },
+      };
+    }
   }
 }
 
@@ -811,6 +873,21 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
       return { ok: true };
     }
 
+    case 'RESTART_SYNC': {
+      if (activeRunId) return { ok: false };
+
+      const state = await getState();
+      await patchState({
+        scanCheckpoint: undefined,
+        sync: {
+          phase: 'idle',
+          progress: 0,
+        },
+      });
+      await startSync(state.account?.username);
+      return { ok: true };
+    }
+
     case 'SCAN_CHECKPOINT': {
       // Backward-compatible with older content scripts. The v1.1 coordinator
       // owns checkpoints directly, so stale v1 payloads are ignored.
@@ -872,6 +949,26 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
       return { ok: true };
     }
   }
+}
+
+async function setSyncPaused(
+  code: SyncErrorCode,
+  message: string,
+) {
+  const state = await getState();
+  await patchState({
+    sync: {
+      ...state.sync,
+      phase: 'paused',
+      progress: state.scanCheckpoint
+        ? checkpointProgress(state.scanCheckpoint)
+        : state.sync.progress,
+      errorCode: code,
+      message,
+      finishedAt: Date.now(),
+      cooldownUntil: undefined,
+    },
+  });
 }
 
 async function setSyncError(
