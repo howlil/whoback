@@ -213,38 +213,122 @@ const repoUrl = 'https://github.com/howlil/whoback';
       </div>
     </section>
 
-    <section id="privacy" class="content-section" data-reveal>
-      <div class="page-shell split-section">
-        <div>
-          <p class="section-kicker">Privacy</p>
-          <h2>Small data contract. Easy to inspect.</h2>
-          <p class="section-copy">WhoBack is open source and avoids an application backend. It reads only what it needs to run the extension inside your existing browser session.</p>
+    <section id="privacy" class="privacy-showcase-section" data-reveal>
+      <div class="page-shell">
+        <div class="privacy-heading">
+          <p class="section-kicker">Privacy by design</p>
+          <h2>What stays on your side.</h2>
+          <p>WhoBack keeps the data flow small: use your existing Instagram session, avoid a WhoBack backend, and keep scan state in this browser.</p>
         </div>
-        <dl class="privacy-list">
-          <div><dt>Password</dt><dd>Not collected</dd></div>
-          <div><dt>Backend</dt><dd>None</dd></div>
-          <div><dt>Session</dt><dd>Your existing Instagram browser session</dd></div>
-          <div><dt>Results</dt><dd>Local extension storage</dd></div>
-        </dl>
-      </div>
-    </section>
 
-    <section class="install-section" data-reveal>
-      <div class="page-shell install-box interactive-surface">
-        <div>
-          <p class="section-kicker">Install</p>
-          <h2>Get the latest release from GitHub.</h2>
-          <p>Download the ZIP, extract it, open <code>chrome://extensions</code>, enable Developer mode, then choose <strong>Load unpacked</strong>.</p>
+        <div class="privacy-board">
+          <article class="privacy-card privacy-card--password interactive-surface">
+            <div class="privacy-visual privacy-visual--password" aria-hidden="true">
+              <div class="privacy-browser">
+                <div class="privacy-browser__bar"><span></span><span></span><span></span><b>instagram.com</b></div>
+                <div class="privacy-browser__body">
+                  <div class="privacy-account">
+                    <span class="privacy-account__avatar">Y</span>
+                    <div><strong>@youraccount</strong><small>Already signed in</small></div>
+                  </div>
+                  <div class="privacy-no-field">
+                    <span>Password field</span>
+                    <strong>Not here</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="privacy-card__copy">
+              <h3>No password form</h3>
+              <p>WhoBack does not ask you to type your Instagram password into the extension.</p>
+            </div>
+          </article>
+
+          <article class="privacy-card privacy-card--session interactive-surface">
+            <div class="privacy-card__eyebrow">Existing session</div>
+            <div class="privacy-session-flow" aria-hidden="true">
+              <span>Chrome</span>
+              <i>→</i>
+              <strong>Instagram</strong>
+              <em>Connected</em>
+            </div>
+            <div class="privacy-card__copy">
+              <h3>Use what is already signed in</h3>
+              <p>The check runs from the Instagram session already open in your browser.</p>
+            </div>
+          </article>
+
+          <article class="privacy-card privacy-card--backend interactive-surface">
+            <div class="privacy-card__eyebrow">WhoBack backend</div>
+            <div class="privacy-zero" aria-hidden="true">0</div>
+            <div class="privacy-card__copy">
+              <h3>No application backend</h3>
+              <p>Relationship results do not need to pass through a WhoBack server.</p>
+            </div>
+          </article>
+
+          <article class="privacy-card privacy-card--storage interactive-surface">
+            <div class="privacy-storage-preview" aria-hidden="true">
+              <div><span>Scan progress</span><strong>Saved</strong></div>
+              <div><span>Relationship result</span><strong>Local</strong></div>
+              <div><span>Resume state</span><strong>Ready</strong></div>
+            </div>
+            <div class="privacy-card__copy">
+              <h3>Results stay in extension storage</h3>
+              <p>Saved progress and relationship snapshots stay on this browser unless you remove them.</p>
+            </div>
+          </article>
         </div>
-        <a class="primary-cta" href={releaseUrl} target="_blank" rel="noreferrer">Open Releases</a>
       </div>
     </section>
   </main>
 
-  <footer>
-    <div class="page-shell footer-inner">
-      <Logo />
-      <span>Independent project · not affiliated with Instagram or Meta</span>
+  <footer class="site-footer" data-reveal>
+    <div class="page-shell">
+      <section class="footer-cta interactive-surface">
+        <div>
+          <p class="footer-cta__eyebrow">WhoBack v1.1</p>
+          <h2>Check who follows back.<br />Keep the account access with you.</h2>
+          <p>Download the release ZIP, extract it, then load the folder from <code>chrome://extensions</code>.</p>
+        </div>
+        <div class="footer-cta__actions">
+          <a class="footer-primary-cta" href={releaseUrl} target="_blank" rel="noreferrer">Download v1.1 <span>→</span></a>
+          <a class="footer-secondary-cta" href={repoUrl} target="_blank" rel="noreferrer">View source</a>
+        </div>
+      </section>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <Logo />
+          <p>A small local-first Chrome extension for checking Instagram follow relationships without handing your password to another service.</p>
+        </div>
+
+        <nav class="footer-column" aria-label="Product">
+          <strong>Product</strong>
+          <a href="#product">Features</a>
+          <a href="#how">How it works</a>
+          <a href="#privacy">Privacy</a>
+        </nav>
+
+        <nav class="footer-column" aria-label="Project">
+          <strong>Project</strong>
+          <a href={repoUrl} target="_blank" rel="noreferrer">GitHub</a>
+          <a href={releaseUrl} target="_blank" rel="noreferrer">Releases</a>
+          <a href={repoUrl + '/blob/master/README.md'} target="_blank" rel="noreferrer">README</a>
+        </nav>
+
+        <div class="footer-install">
+          <strong>Install manually</strong>
+          <p>Download ZIP → extract → Developer mode → Load unpacked.</p>
+          <code>chrome://extensions</code>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>WhoBack · open source</span>
+        <span>Independent project · not affiliated with Instagram or Meta</span>
+      </div>
     </div>
   </footer>
+
 </BaseLayout>
