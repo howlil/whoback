@@ -308,6 +308,18 @@ async function runAdaptiveSync(
       return;
     }
 
+    if (
+      checkpoint.followingTotal != null
+      && following.size < checkpoint.followingTotal
+    ) {
+      await persistMaps(checkpoint, following, followers);
+      await setSyncError(
+        'REQUEST_BLOCKED',
+        `Instagram returned an incomplete following list (${following.size.toLocaleString()} / ${checkpoint.followingTotal.toLocaleString()}). Progress was saved.`,
+      );
+      return;
+    }
+
     const mutualIds = new Set(followers.keys());
     let unresolvedFollowing = 0;
     for (const user of following.values()) {
@@ -348,6 +360,23 @@ async function runAdaptiveSync(
         followers,
       );
       if (!ok) return;
+
+      if (
+        checkpoint.followersTotal != null
+        && followers.size < checkpoint.followersTotal
+      ) {
+        checkpoint.strategy = 'verify-following';
+        checkpoint.telemetry.strategy = 'verify-following';
+        const verified = await verifyFollowing(
+          runId,
+          tabId,
+          viewerId,
+          checkpoint,
+          following,
+          followers,
+        );
+        if (!verified) return;
+      }
     }
 
     if (!isCurrentRun(runId)) return;
@@ -382,6 +411,8 @@ async function runAdaptiveSync(
       ...(coverage === 'following-only' ? { followBack } : {}),
     };
 
+    checkpoint.telemetry.totalMs = Date.now() - checkpoint.startedAt;
+
     const state = await getState();
     const snapshots = [...state.snapshots, snapshot].slice(-30);
     const previous = snapshots.at(-2);
@@ -399,6 +430,7 @@ async function runAdaptiveSync(
         detectedAt: Date.now(),
       },
       scanCheckpoint: undefined,
+      lastScanTelemetry: checkpoint.telemetry,
       snapshots,
       sync: {
         phase: 'complete',
