@@ -20,6 +20,7 @@ export type MainWorldSyncFailure = {
     code: SyncErrorCode;
     message: string;
     status?: number;
+    retryAfterMs?: number;
   };
 };
 
@@ -55,9 +56,15 @@ export async function runInstagramMainWorldSync(
     code: SyncErrorCode,
     message: string,
     status?: number,
+    retryAfterMs?: number,
   ): MainWorldSyncFailure => ({
     ok: false,
-    error: { code, message, ...(status ? { status } : {}) },
+    error: {
+      code,
+      message,
+      ...(status ? { status } : {}),
+      ...(retryAfterMs ? { retryAfterMs } : {}),
+    },
   });
 
   const request = async (path: string): Promise<
@@ -101,10 +108,16 @@ export async function runInstagramMainWorldSync(
       }
 
       if (response.status === 429) {
+        const retryAfterSeconds = Number(response.headers.get('retry-after') ?? 0);
+        const retryAfterMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+          ? retryAfterSeconds * 1000
+          : 15 * 60 * 1000;
+
         return fail(
           'RATE_LIMITED',
-          'Instagram rate-limited the scan. Your previous data is safe; try again in a few minutes.',
+          'Instagram rate-limited the scan. WhoBack paused scanning to protect your account.',
           429,
+          retryAfterMs,
         );
       }
 
@@ -228,8 +241,9 @@ export async function runInstagramMainWorldSync(
       seenCursors.add(next);
       maxId = next;
 
-      // Keep request cadence conservative to reduce rate-limit risk.
-      await sleep(500 + Math.floor(Math.random() * 250));
+      // Match the slower cadence used by maintained Instagram relationship tools.
+      // A little jitter avoids sending perfectly periodic requests.
+      await sleep(1100 + Math.floor(Math.random() * 400));
     }
 
     return fail(
