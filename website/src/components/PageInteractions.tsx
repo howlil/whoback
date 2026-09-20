@@ -21,11 +21,23 @@ function animateCount(element: HTMLElement) {
 export function PageInteractions() {
   useEffect(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const hero = document.querySelector<HTMLElement>('.reference-hero');
     const revealTargets = [...document.querySelectorAll<HTMLElement>('[data-reveal]')];
+
+    const pointerQuery = window.matchMedia('(pointer: fine)');
+    const onPointerMove = (event: PointerEvent) => {
+      if (!hero || reduceMotion || !pointerQuery.matches) return;
+      const x = event.clientX / window.innerWidth - 0.5;
+      const y = event.clientY / window.innerHeight - 0.5;
+      hero.style.setProperty('--hero-shift-x', `${x * -10}px`);
+      hero.style.setProperty('--hero-shift-y', `${y * -7}px`);
+    };
+
+    if (!reduceMotion) window.addEventListener('pointermove', onPointerMove, { passive: true });
 
     if (reduceMotion) {
       for (const element of revealTargets) element.classList.add('is-visible');
-      return;
+      return () => window.removeEventListener('pointermove', onPointerMove);
     }
 
     const counted = new WeakSet<HTMLElement>();
@@ -49,7 +61,10 @@ export function PageInteractions() {
     );
 
     for (const target of revealTargets) observer.observe(target);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('pointermove', onPointerMove);
+    };
   }, []);
 
   return null;

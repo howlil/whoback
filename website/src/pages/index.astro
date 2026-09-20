@@ -1,55 +1,75 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Logo from '../components/Logo.astro';
-import { ProductPreview } from '../components/ProductPreview';
-import { InteractiveBackground } from '../components/InteractiveBackground';
 import { PageInteractions } from '../components/PageInteractions';
+import {
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowRight,
+  ArrowUp,
+  Code2,
+  Download,
+  HardDrive,
+  KeyRound,
+  LogIn,
+  ServerOff,
+} from 'lucide-react';
 
 const releaseUrl = 'https://github.com/howlil/whoback/releases/latest';
 const repoUrl = 'https://github.com/howlil/whoback';
+const avatarImages = {
+  alex: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=96&q=82',
+  nara: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=96&q=82',
+  mika: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=96&q=82',
+  maya: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=96&q=82',
+  rian: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=96&q=82',
+  sarah: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=96&q=82',
+};
 ---
 
 <BaseLayout>
-  <InteractiveBackground client:load />
   <PageInteractions client:load />
 
   <header class="floating-header">
     <div class="compact-nav">
       <Logo />
-      <nav class="hidden items-center gap-5 text-[12px] font-medium text-muted md:flex" aria-label="Primary">
+      <nav class="hidden items-center gap-5 text-[14px] font-semibold text-muted md:flex" aria-label="Primary">
         <a href="#product">Product</a>
         <a href="#how">How it works</a>
         <a href="#privacy">Privacy</a>
-        <a href={repoUrl} target="_blank" rel="noreferrer">GitHub</a>
+        <a href={repoUrl} target="_blank" rel="noreferrer"><Code2 size={15} strokeWidth={1.8} aria-hidden="true" />GitHub</a>
       </nav>
-      <a class="nav-cta" href={releaseUrl} target="_blank" rel="noreferrer">Get v1.1</a>
+      <div class="nav-actions">
+        <a class="nav-cta" href={releaseUrl} target="_blank" rel="noreferrer">
+          Get WhoBack <Download class="nav-cta__icon" size={16} strokeWidth={1.8} aria-hidden="true" />
+        </a>
+      </div>
     </div>
   </header>
 
   <main class="site-content">
     <section class="reference-hero">
       <div class="page-shell">
-        <div class="announcement">
-          <span>New</span>
-          <p>v1.1 adds adaptive scans and recoverable resume</p>
-          <span aria-hidden="true">→</span>
-        </div>
-
         <div class="hero-copy">
           <h1>
-            See who <mark>follows you back</mark><br />
-            without handing over your password.
+            Did they come <mark>back?</mark>
           </h1>
           <p>
-            WhoBack is a local-first Chrome extension that checks Instagram relationships from the session already open in your browser.
+            See who follows you back, who doesn&apos;t, and keep your circle clear — privately in your browser.
           </p>
           <div class="hero-actions">
-            <a class="primary-cta" href={releaseUrl} target="_blank" rel="noreferrer">Download v1.1</a>
-            <a class="secondary-cta" href={repoUrl} target="_blank" rel="noreferrer">View source</a>
+            <a class="primary-cta" href={releaseUrl} target="_blank" rel="noreferrer">
+              Get WhoBack <span class="cta-icon" aria-hidden="true"><ArrowRight size={17} strokeWidth={1.8} /></span>
+            </a>
           </div>
         </div>
 
-        <ProductPreview client:load />
+        <div class="hero-trust" aria-label="WhoBack benefits">
+          <span>Works in your browser</span>
+          <span>Your data stays local</span>
+          <span>No account needed</span>
+        </div>
+
       </div>
     </section>
 
@@ -57,79 +77,106 @@ const repoUrl = 'https://github.com/howlil/whoback';
       <div class="page-shell">
         <div class="showcase-heading">
           <p class="section-kicker">Product features</p>
-          <h2>The relationship views that matter.</h2>
-          <p>See one-way follows, mutuals, and recoverable scan progress without checking profiles one by one.</p>
+          <h2>The relationship views that <mark>matter.</mark></h2>
+          <p>See who follows back, who doesn&apos;t, and what changed since your last scan.</p>
         </div>
 
         <div class="feature-board">
-          <article class="feature-tile interactive-surface feature-tile--not-back">
+          <article class="feature-tile feature-tile--not-back">
             <div class="feature-tile__eyebrow">
-              <span class="feature-dot feature-dot--danger"></span>
-              Primary view
+              Doesn&apos;t follow back
             </div>
+
+            <div class="feature-stat-group">
+              <div class="feature-stat feature-stat--danger" data-count="128">128</div>
+              <div class="feature-stat-caption">accounts you follow</div>
+            </div>
+            <p class="feature-tile__hint">You follow them. They don&apos;t follow you back.</p>
 
             <div class="feature-list-preview" aria-hidden="true">
               <div class="feature-user-row">
-                <span class="feature-avatar">A</span>
-                <span><strong>@alex</strong><small>Following</small></span>
-                <em>Not back</em>
+                <span class="feature-avatar"><img src={avatarImages.alex} alt="" loading="lazy" /></span>
+                <span><strong>@alex</strong></span>
+                <em>Doesn&apos;t follow back</em>
               </div>
               <div class="feature-user-row">
-                <span class="feature-avatar">N</span>
-                <span><strong>@nara</strong><small>Following</small></span>
-                <em>Not back</em>
+                <span class="feature-avatar"><img src={avatarImages.nara} alt="" loading="lazy" /></span>
+                <span><strong>@nara</strong></span>
+                <em>Doesn&apos;t follow back</em>
               </div>
               <div class="feature-user-row feature-user-row--muted">
-                <span class="feature-avatar">M</span>
-                <span><strong>@mika</strong><small>Following</small></span>
-                <em>Not back</em>
+                <span class="feature-avatar"><img src={avatarImages.mika} alt="" loading="lazy" /></span>
+                <span><strong>@mika</strong></span>
+                <em>Doesn&apos;t follow back</em>
               </div>
             </div>
 
-            <div class="feature-tile__copy">
-              <h3>Don&apos;t follow you back</h3>
-              <p>People you follow who do not follow you back.</p>
+          </article>
+
+          <article class="feature-tile feature-tile--mutual">
+            <div class="feature-tile__eyebrow">
+              Mutual
+            </div>
+            <div class="feature-stat feature-stat--positive" data-count="603">603</div>
+            <div class="feature-stat-caption">mutual accounts</div>
+            <div class="feature-connection" aria-hidden="true">
+              <span><img src={avatarImages.nara} alt="" loading="lazy" /></span><ArrowLeftRight size={27} strokeWidth={1.7} aria-hidden="true" /><span><img src={avatarImages.rian} alt="" loading="lazy" /></span>
+            </div>
+            <p class="feature-connection-caption">You follow each other.</p>
+            <div class="feature-mini-avatars" aria-hidden="true">
+              <span><img src={avatarImages.nara} alt="" loading="lazy" /></span>
+              <span><img src={avatarImages.rian} alt="" loading="lazy" /></span>
+              <span><img src={avatarImages.mika} alt="" loading="lazy" /></span>
+              <em>+599</em>
             </div>
           </article>
 
-          <div class="feature-stack">
-            <article class="feature-tile interactive-surface feature-tile--mutual">
-              <div class="feature-tile__eyebrow">
-                <span class="feature-dot feature-dot--positive"></span>
-                Mutual
-              </div>
-              <div class="feature-stat feature-stat--positive" data-count="603">603</div>
-              <p>People you follow who follow you back.</p>
-            </article>
-
-            <article class="feature-tile interactive-surface feature-tile--resume">
-              <div class="resume-status">
-                <span class="resume-icon">↻</span>
-                <div><strong>Progress saved</strong><small>616 following scanned</small></div>
-              </div>
-              <div class="resume-bar"><span></span></div>
-              <div class="feature-tile__copy">
-                <h3>Resume scan</h3>
-                <p>Interrupted scans continue from saved progress instead of starting over.</p>
-              </div>
-            </article>
-          </div>
-
-          <article class="feature-tile interactive-surface feature-tile--fans">
+          <article class="feature-tile feature-tile--fans">
             <div class="feature-tile__eyebrow">
-              <span class="feature-dot feature-dot--warn"></span>
-              Full scan
+              You don&apos;t follow back
             </div>
             <div>
-              <div class="feature-stat feature-stat--warn" data-count="828">828</div>
-              <div class="feature-stat-caption">accounts</div>
+              <div class="feature-stat feature-stat--warn" data-count="92">92</div>
+              <div class="feature-stat-caption">accounts following you</div>
             </div>
-            <div class="feature-tile__copy">
-              <h3>You don&apos;t follow back</h3>
-              <p>Accounts that follow you while staying outside your following list.</p>
-              <small>Available after a full follower scan.</small>
+            <p class="feature-tile__hint">They follow you. You don&apos;t follow them back.</p>
+            <div class="feature-list-preview" aria-hidden="true">
+              <div class="feature-user-row">
+                <span class="feature-avatar"><img src={avatarImages.maya} alt="" loading="lazy" /></span>
+                <span><strong>@maya</strong></span>
+                <em>Follows you</em>
+              </div>
+              <div class="feature-user-row">
+                <span class="feature-avatar"><img src={avatarImages.rian} alt="" loading="lazy" /></span>
+                <span><strong>@rian</strong></span>
+                <em>Follows you</em>
+              </div>
+              <div class="feature-user-row feature-user-row--muted">
+                <span class="feature-avatar"><img src={avatarImages.sarah} alt="" loading="lazy" /></span>
+                <span><strong>@sarah</strong></span>
+                <em>Follows you</em>
+              </div>
             </div>
           </article>
+
+        </div>
+
+        <div class="feature-scan-summary">
+          <div class="feature-scan-summary__heading">
+            <span></span>
+            <strong>Since your last scan</strong>
+            <span></span>
+          </div>
+          <div class="feature-scan-summary__metrics">
+            <div class="feature-scan-metric feature-scan-metric--positive">
+              <strong><ArrowUp size={28} strokeWidth={1.8} aria-hidden="true" /> +12</strong>
+              <small>New followers</small>
+            </div>
+            <div class="feature-scan-metric feature-scan-metric--danger">
+              <strong><ArrowDown size={28} strokeWidth={1.8} aria-hidden="true" /> −7</strong>
+              <small>People who unfollowed you</small>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -137,20 +184,12 @@ const repoUrl = 'https://github.com/howlil/whoback';
     <section id="how" class="workflow-section" data-reveal>
       <div class="page-shell">
         <div class="workflow-heading">
-          <p class="section-kicker">How it works</p>
           <h2>Check your follow relationships in <mark>3 simple steps</mark></h2>
-          <p>Keep Instagram signed in, run WhoBack, then inspect the relationship result.</p>
+          <p>Keep Instagram open, run WhoBack, then review the result.</p>
         </div>
 
         <div class="workflow-cards">
-          <div class="workflow-step-label workflow-step-label--one">
-            <span>Step 1</span>
-            <svg viewBox="0 0 58 34" aria-hidden="true">
-              <path d="M2 4c27 0 38 5 39 24m0 0-5-6m5 6 5-5" />
-            </svg>
-          </div>
-
-          <article class="workflow-card interactive-surface">
+          <article class="workflow-card">
             <div class="workflow-visual workflow-visual--instagram">
               <div class="browser-mini">
                 <div class="browser-mini__bar"><span></span><span></span><span></span><b>instagram.com</b></div>
@@ -163,40 +202,26 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </div>
             <div class="workflow-card__copy">
               <h3>Open Instagram</h3>
-              <p>Stay signed in to instagram.com in Chrome. WhoBack uses that existing browser session.</p>
+              <p>Stay signed in to instagram.com in Chrome.</p>
             </div>
           </article>
 
-          <div class="workflow-step-label workflow-step-label--two">
-            <span>Step 2</span>
-            <svg viewBox="0 0 58 34" aria-hidden="true">
-              <path d="M56 30c-27 0-38-5-39-24m0 0 5 6m-5-6-5 5" />
-            </svg>
-          </div>
-
-          <article class="workflow-card interactive-surface">
+          <article class="workflow-card">
             <div class="workflow-visual workflow-visual--scan">
               <div class="scan-mini">
                 <div class="scan-mini__header"><strong>WhoBack</strong><span>Scanning</span></div>
                 <div class="scan-mini__row"><span>Following</span><strong>616</strong></div>
                 <div class="scan-mini__progress"><span></span></div>
-                <button type="button" tabindex="-1">Check now</button>
+                <span class="scan-mini__button" aria-hidden="true">Check now</span>
               </div>
             </div>
             <div class="workflow-card__copy">
               <h3>Run WhoBack</h3>
-              <p>Open the extension and start a check. Progress is saved while the scan runs.</p>
+              <p>Open the extension and start a check.</p>
             </div>
           </article>
 
-          <div class="workflow-step-label workflow-step-label--three">
-            <span>Step 3</span>
-            <svg viewBox="0 0 58 34" aria-hidden="true">
-              <path d="M56 4c-27 0-38 5-39 24m0 0 5-6m-5 6-5-5" />
-            </svg>
-          </div>
-
-          <article class="workflow-card interactive-surface">
+          <article class="workflow-card">
             <div class="workflow-visual workflow-visual--result">
               <div class="result-mini">
                 <div><span>Mutual</span><strong class="result-mini__positive">603</strong></div>
@@ -206,7 +231,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </div>
             <div class="workflow-card__copy">
               <h3>View the result</h3>
-              <p>Inspect mutuals and one-way follows without checking Instagram profiles individually.</p>
+              <p>See mutual and one-way relationships together.</p>
             </div>
           </article>
         </div>
@@ -216,66 +241,37 @@ const repoUrl = 'https://github.com/howlil/whoback';
     <section id="privacy" class="privacy-showcase-section" data-reveal>
       <div class="page-shell">
         <div class="privacy-heading">
-          <p class="section-kicker">Privacy by design</p>
-          <h2>What stays on your side.</h2>
-          <p>WhoBack keeps the data flow small: use your existing Instagram session, avoid a WhoBack backend, and keep scan state in this browser.</p>
+          <h2>What stays in your browser.</h2>
+          <p>Use your existing Instagram session. Keep scan progress and results local.</p>
         </div>
 
-        <div class="privacy-board">
-          <article class="privacy-card privacy-card--password interactive-surface">
-            <div class="privacy-visual privacy-visual--password" aria-hidden="true">
-              <div class="privacy-browser">
-                <div class="privacy-browser__bar"><span></span><span></span><span></span><b>instagram.com</b></div>
-                <div class="privacy-browser__body">
-                  <div class="privacy-account">
-                    <span class="privacy-account__avatar">Y</span>
-                    <div><strong>@youraccount</strong><small>Already signed in</small></div>
-                  </div>
-                  <div class="privacy-no-field">
-                    <span>Password field</span>
-                    <strong>Not here</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="privacy-card__copy">
+        <div class="privacy-ledger">
+          <article class="privacy-ledger__item">
+            <span class="privacy-ledger__icon" aria-hidden="true"><KeyRound size={20} strokeWidth={1.8} /></span>
+            <div>
               <h3>No password form</h3>
-              <p>WhoBack does not ask you to type your Instagram password into the extension.</p>
+              <p>WhoBack never asks for your Instagram password.</p>
             </div>
           </article>
-
-          <article class="privacy-card privacy-card--session interactive-surface">
-            <div class="privacy-card__eyebrow">Existing session</div>
-            <div class="privacy-session-flow" aria-hidden="true">
-              <span>Chrome</span>
-              <i>→</i>
-              <strong>Instagram</strong>
-              <em>Connected</em>
-            </div>
-            <div class="privacy-card__copy">
-              <h3>Use what is already signed in</h3>
-              <p>The check runs from the Instagram session already open in your browser.</p>
+          <article class="privacy-ledger__item">
+            <span class="privacy-ledger__icon" aria-hidden="true"><LogIn size={20} strokeWidth={1.8} /></span>
+            <div>
+              <h3>Use your Instagram session</h3>
+              <p>The check runs from the Instagram session already open in Chrome.</p>
             </div>
           </article>
-
-          <article class="privacy-card privacy-card--backend interactive-surface">
-            <div class="privacy-card__eyebrow">WhoBack backend</div>
-            <div class="privacy-zero" aria-hidden="true">0</div>
-            <div class="privacy-card__copy">
-              <h3>No application backend</h3>
-              <p>Relationship results do not need to pass through a WhoBack server.</p>
+          <article class="privacy-ledger__item">
+            <span class="privacy-ledger__icon" aria-hidden="true"><ServerOff size={20} strokeWidth={1.8} /></span>
+            <div>
+              <h3>No WhoBack server</h3>
+              <p>Relationship results do not pass through a WhoBack server.</p>
             </div>
           </article>
-
-          <article class="privacy-card privacy-card--storage interactive-surface">
-            <div class="privacy-storage-preview" aria-hidden="true">
-              <div><span>Scan progress</span><strong>Saved</strong></div>
-              <div><span>Relationship result</span><strong>Local</strong></div>
-              <div><span>Resume state</span><strong>Ready</strong></div>
-            </div>
-            <div class="privacy-card__copy">
-              <h3>Results stay in extension storage</h3>
-              <p>Saved progress and relationship snapshots stay on this browser unless you remove them.</p>
+          <article class="privacy-ledger__item">
+            <span class="privacy-ledger__icon" aria-hidden="true"><HardDrive size={20} strokeWidth={1.8} /></span>
+            <div>
+              <h3>Results stay local</h3>
+              <p>Progress and relationship snapshots stay in this browser.</p>
             </div>
           </article>
         </div>
@@ -285,15 +281,15 @@ const repoUrl = 'https://github.com/howlil/whoback';
 
   <footer class="site-footer" data-reveal>
     <div class="page-shell">
-      <section class="footer-cta interactive-surface">
+      <section class="footer-cta">
         <div>
-          <p class="footer-cta__eyebrow">WhoBack v1.1</p>
-          <h2>Check who follows back.<br />Keep the account access with you.</h2>
-          <p>Download the release ZIP, extract it, then load the folder from <code>chrome://extensions</code>.</p>
+          <h2>Check who follows back.<br />Keep your Instagram session in your browser.</h2>
+          <p>Download the release ZIP, extract it, then choose Load unpacked in <code>chrome://extensions</code>.</p>
         </div>
         <div class="footer-cta__actions">
-          <a class="footer-primary-cta" href={releaseUrl} target="_blank" rel="noreferrer">Download v1.1 <span>→</span></a>
-          <a class="footer-secondary-cta" href={repoUrl} target="_blank" rel="noreferrer">View source</a>
+          <a class="footer-primary-cta" href={releaseUrl} target="_blank" rel="noreferrer">
+            Get WhoBack <span aria-hidden="true"><ArrowRight size={16} strokeWidth={1.8} /></span>
+          </a>
         </div>
       </section>
 
@@ -319,7 +315,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
 
         <div class="footer-install">
           <strong>Install manually</strong>
-          <p>Download ZIP → extract → Developer mode → Load unpacked.</p>
+          <p>Download the ZIP, extract it, turn on Developer mode, then choose Load unpacked.</p>
           <code>chrome://extensions</code>
         </div>
       </div>

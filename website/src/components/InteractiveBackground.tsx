@@ -55,8 +55,6 @@ export function InteractiveBackground() {
 
   return (
     <div className="interactive-background" aria-hidden="true">
-      <div className="interactive-background__grid" />
-
       {finePointer && !reduceMotion && (
         <>
           <motion.div
