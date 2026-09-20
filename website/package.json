@@ -1,0 +1,29 @@
+{
+  "name": "whoback-website",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "motion": "latest",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@astrojs/react": "latest",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "astro": "latest",
+    "tailwindcss": "4.3.3",
+    "typescript": "latest"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.17.1"
+}

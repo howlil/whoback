@@ -4,3 +4,6 @@ node_modules
 .env
 *.zip
 .DS_Store
+.astro/
+dist/
+website/website/
