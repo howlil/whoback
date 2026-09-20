@@ -6,7 +6,7 @@ export default defineConfig({
   manifest: {
     name: 'WhoBack',
     description: "See who doesn't follow you back on Instagram.",
-    version: '1.0.0',
+    version: '1.1.0',
     permissions: ['storage', 'tabs', 'alarms', 'sidePanel', 'scripting', 'cookies'],
     host_permissions: ['https://www.instagram.com/*'],
   },
