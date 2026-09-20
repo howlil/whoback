@@ -76,7 +76,10 @@ describe('runInstagramMainWorldSync', () => {
   });
 
   it('maps Instagram rate limiting without throwing across the injection boundary', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('', { status: 429 })) as typeof fetch;
+    globalThis.fetch = vi.fn(async () => new Response('', {
+      status: 429,
+      headers: { 'retry-after': '120' },
+    })) as typeof fetch;
 
     const result = await runInstagramMainWorldSync(null);
 
@@ -84,8 +87,9 @@ describe('runInstagramMainWorldSync', () => {
       ok: false,
       error: {
         code: 'RATE_LIMITED',
-        message: 'Instagram rate-limited the scan. Your previous data is safe; try again in a few minutes.',
+        message: 'Instagram rate-limited the scan. WhoBack paused scanning to protect your account.',
         status: 429,
+        retryAfterMs: 120_000,
       },
     });
   });
