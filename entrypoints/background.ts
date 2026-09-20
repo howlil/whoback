@@ -6,6 +6,7 @@ import type {
   SyncErrorCode,
 } from '../src/domain/types';
 import { isInstagramUsername } from '../src/instagram/profile-identity';
+import { resolveInstagramViewerId } from '../src/instagram/session-identity';
 import {
   runInstagramMainWorldSync,
   type MainWorldSyncInput,
@@ -82,20 +83,13 @@ function isBusy(state: ExtensionState) {
 }
 
 async function resolveViewerId(state: ExtensionState): Promise<string | null> {
-  try {
-    const cookie = await browser.cookies.get({
-      url: INSTAGRAM_URL,
-      name: 'ds_user_id',
-    });
+  const identity = await resolveInstagramViewerId(
+    (details) => browser.cookies.get(details),
+    state.account?.platformUserId,
+    state.scanCheckpoint?.accountId,
+  );
 
-    if (cookie?.value?.trim()) return cookie.value.trim();
-  } catch {
-    // Fall back to previously confirmed local identity.
-  }
-
-  return state.account?.platformUserId
-    ?? state.scanCheckpoint?.accountId
-    ?? null;
+  return identity?.id ?? null;
 }
 
 async function startSync(username?: string) {
