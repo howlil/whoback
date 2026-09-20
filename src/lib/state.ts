@@ -51,3 +51,17 @@ export function isSnapshotStale(state: ExtensionState, now = Date.now()): boolea
   if (!latest) return true;
   return now - latest.capturedAt >= state.settings.syncIntervalHours * 60 * 60 * 1000;
 }
+
+export function isRateLimitCooldownActive(state: ExtensionState, now = Date.now()): boolean {
+  return Boolean(state.sync.cooldownUntil && state.sync.cooldownUntil > now);
+}
+
+export function canAutoSync(state: ExtensionState, now = Date.now()): boolean {
+  return Boolean(
+    state.settings.autoSync
+    && state.account
+    && state.snapshots.length > 0
+    && isSnapshotStale(state, now)
+    && !isRateLimitCooldownActive(state, now),
+  );
+}
