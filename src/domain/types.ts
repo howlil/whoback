@@ -59,6 +59,8 @@ export interface ScanTelemetry {
   followingPages: number;
   followerPages: number;
   relationshipChecks: number;
+  followingCountGap?: number;
+  followersCountGap?: number;
   totalMs?: number;
   strategy?: ScanStrategy;
 }
@@ -77,6 +79,7 @@ export interface ScanCheckpoint {
   requestCount: number;
   telemetry: ScanTelemetry;
   startedAt: number;
+  followingRetryCount?: number;
   updatedAt: number;
 }
 
@@ -89,6 +92,7 @@ export type SyncPhase =
   | 'verifying'
   | 'processing'
   | 'complete'
+  | 'paused'
   | 'error';
 
 export type SyncErrorCode =
