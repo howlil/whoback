@@ -1,4 +1,6 @@
 export type RelationshipView = 'not-back' | 'fans' | 'mutual';
+export type SnapshotCoverage = 'full' | 'following-only';
+export type ScanStrategy = 'full-lists' | 'verify-following';
 
 export interface InstagramAccount {
   username: string;
@@ -16,6 +18,10 @@ export interface RelationshipSnapshot {
   capturedAt: number;
   followers: string[];
   following: string[];
+  coverage?: SnapshotCoverage;
+  followersTotal?: number;
+  followingTotal?: number;
+  followBack?: Record<string, boolean>;
 }
 
 export interface RelationshipAnalysis {
@@ -24,6 +30,7 @@ export interface RelationshipAnalysis {
   mutual: string[];
   notFollowingBack: string[];
   youDontFollowBack: string[];
+  followersComplete: boolean;
 }
 
 export interface RelationshipChanges {
@@ -31,9 +38,10 @@ export interface RelationshipChanges {
   unfollowers: string[];
   newFollowing: string[];
   youUnfollowed: string[];
+  followersComplete: boolean;
 }
 
-export type ScanCheckpointPhase = 'following' | 'followers';
+export type ScanCheckpointPhase = 'following' | 'followers' | 'verifying';
 
 export interface ScanCheckpointList {
   users: InstagramUserRef[];
@@ -42,14 +50,31 @@ export interface ScanCheckpointList {
   pages: number;
 }
 
+export interface ScanTelemetry {
+  requests: number;
+  networkMs: number;
+  plannedWaitMs: number;
+  actualWaitMs: number;
+  storageWriteMs: number;
+  followingPages: number;
+  followerPages: number;
+  relationshipChecks: number;
+  strategy?: ScanStrategy;
+}
+
 export interface ScanCheckpoint {
-  version: 1;
+  version: 2;
   accountId: string;
   username?: string;
   phase: ScanCheckpointPhase;
+  strategy?: ScanStrategy;
+  followingTotal?: number | null;
+  followersTotal?: number | null;
   following: ScanCheckpointList;
   followers: ScanCheckpointList;
+  verified: Record<string, boolean>;
   requestCount: number;
+  telemetry: ScanTelemetry;
   startedAt: number;
   updatedAt: number;
 }
@@ -57,8 +82,10 @@ export interface ScanCheckpoint {
 export type SyncPhase =
   | 'idle'
   | 'starting'
+  | 'planning'
   | 'followers'
   | 'following'
+  | 'verifying'
   | 'processing'
   | 'complete'
   | 'error';
