@@ -55,7 +55,7 @@ export function ProductPreview() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <div className="hero-cards" role="img" aria-label="Illustrative WhoBack preview: use an existing Instagram session, scan relationships, and see a local result.">
+    <div className="hero-cards" aria-label="WhoBack product preview">
       <motion.article
         className="hero-card hero-card--left"
         initial={reduceMotion ? false : floatingAnimation(-5, 0, -10, 0.05).initial}
