@@ -11,8 +11,12 @@ export function InteractiveBackground() {
 
   const ringX = useTransform(x, (value) => value * 100);
   const ringY = useTransform(y, (value) => value * 100);
+  const cursorLeft = useTransform(ringX, (value) => `${value}%`);
+  const cursorTop = useTransform(ringY, (value) => `${value}%`);
   const driftX = useTransform(x, [0, 1], [-14, 14]);
   const driftY = useTransform(y, [0, 1], [-10, 10]);
+  const reverseDriftX = useTransform(driftX, (value) => -value * 0.7);
+  const reverseDriftY = useTransform(driftY, (value) => -value * 0.6);
 
   useEffect(() => {
     if (reduceMotion) return;
@@ -35,10 +39,7 @@ export function InteractiveBackground() {
         <>
           <motion.div
             className="interactive-background__cursor"
-            style={{
-              left: useTransform(ringX, (value) => `${value}%`),
-              top: useTransform(ringY, (value) => `${value}%`),
-            }}
+            style={{ left: cursorLeft, top: cursorTop }}
           />
           <motion.div
             className="interactive-background__orbit interactive-background__orbit--one"
@@ -46,10 +47,7 @@ export function InteractiveBackground() {
           />
           <motion.div
             className="interactive-background__orbit interactive-background__orbit--two"
-            style={{
-              x: useTransform(driftX, (value) => -value * 0.7),
-              y: useTransform(driftY, (value) => -value * 0.6),
-            }}
+            style={{ x: reverseDriftX, y: reverseDriftY }}
           />
         </>
       )}
