@@ -59,6 +59,7 @@ export interface ScanTelemetry {
   followingPages: number;
   followerPages: number;
   relationshipChecks: number;
+  totalMs?: number;
   strategy?: ScanStrategy;
 }
 
@@ -128,6 +129,7 @@ export interface ExtensionState {
   account: InstagramAccount | null;
   snapshots: RelationshipSnapshot[];
   scanCheckpoint?: ScanCheckpoint;
+  lastScanTelemetry?: ScanTelemetry;
   sync: SyncState;
   settings: Settings;
 }
