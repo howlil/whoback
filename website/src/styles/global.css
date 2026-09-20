@@ -1707,3 +1707,140 @@ footer {
     transition: none !important;
   }
 }
+
+
+/* Product-proof hero: keep the promise connected to a visible product surface. */
+.reference-hero {
+  min-height: 0;
+  height: auto;
+  padding-bottom: 58px;
+}
+
+.hero-copy {
+  margin-top: 42px;
+}
+
+.hero-copy > p {
+  max-width: 600px;
+}
+
+.hero-install-note {
+  display: block;
+  margin-top: 12px;
+  color: rgb(39 35 82 / 0.68);
+  font-size: 11px;
+  letter-spacing: 0.015em;
+}
+
+.hero-cards {
+  max-width: 1040px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.16fr) minmax(0, 0.92fr);
+  gap: 12px;
+  margin: 54px auto 0;
+  padding: 0;
+}
+
+.hero-card {
+  min-height: 258px;
+  border-color: rgb(255 255 255 / 0.72);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 0 rgb(18 19 26 / 0.05),
+    0 18px 40px rgb(18 19 26 / 0.08);
+}
+
+.hero-card--left {
+  border-radius: 20px 12px 12px 20px;
+}
+
+.hero-card--center {
+  min-height: 278px;
+  border-radius: 20px;
+  box-shadow:
+    0 1px 0 rgb(18 19 26 / 0.06),
+    0 24px 52px rgb(18 19 26 / 0.12);
+}
+
+.hero-card--right {
+  border-radius: 12px 20px 20px 12px;
+}
+
+.hero-proof-note {
+  margin: 14px 0 0;
+  color: rgb(255 255 255 / 0.72);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.feature-showcase-section {
+  padding-top: 96px;
+}
+
+.feature-board {
+  max-width: 1040px;
+  margin-top: 44px;
+}
+
+.feature-tile {
+  padding-inline: 36px;
+}
+
+.workflow-section,
+.privacy-showcase-section {
+  padding-top: 96px;
+  padding-bottom: 100px;
+}
+
+.workflow-cards {
+  max-width: 1040px;
+  gap: 14px;
+}
+
+.workflow-card {
+  border-radius: 14px;
+  box-shadow: 0 1px 0 rgb(18 19 26 / 0.04);
+}
+
+.workflow-visual {
+  min-height: 214px;
+}
+
+@media (max-width: 760px) {
+  .reference-hero {
+    min-height: 0;
+    height: auto;
+    padding-bottom: 48px;
+  }
+
+  .hero-copy {
+    margin-top: 40px;
+  }
+
+  .hero-cards {
+    gap: 14px;
+    margin-top: 38px;
+    padding: 0;
+  }
+
+  .hero-card,
+  .hero-card--center {
+    min-height: 238px;
+  }
+
+  .hero-proof-note {
+    max-width: 30ch;
+    margin-inline: auto;
+    line-height: 1.45;
+  }
+
+  .feature-showcase-section {
+    padding-top: 72px;
+  }
+
+  .workflow-section,
+  .privacy-showcase-section {
+    padding-top: 76px;
+    padding-bottom: 80px;
+  }
+}
