@@ -36,7 +36,7 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  background: #fff;
+  background: transparent;
   color: var(--color-ink);
 }
 
@@ -110,9 +110,10 @@ button:focus-visible {
 }
 
 .reference-hero {
+  position: relative;
   overflow: hidden;
   padding: 104px 0 0;
-  background: #fff;
+  background: rgb(255 255 255 / 0.90);
 }
 
 .announcement {
@@ -217,22 +218,10 @@ button:focus-visible {
   border-radius: 26px;
   background: #fff;
   box-shadow:
-    0 18px 34px rgb(18 19 26 / 0.07),
-    0 6px 16px rgb(18 19 26 / 0.04),
-    inset 0 1px 0 rgb(255 255 255 / 0.85);
+    0 18px 34px rgb(18 19 26 / 0.065),
+    0 6px 16px rgb(18 19 26 / 0.035);
   transform-origin: bottom center;
   will-change: transform, box-shadow;
-}
-
-.hero-card::before {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    radial-gradient(circle at top, rgb(255 255 255 / 0.9), transparent 34%),
-    linear-gradient(to bottom, rgb(247 247 251 / 0.32), rgb(255 255 255 / 0));
-  content: '';
-  pointer-events: none;
 }
 
 .hero-card--left {
@@ -302,7 +291,7 @@ button:focus-visible {
 .mini-action--soft {
   margin: 26px auto 0;
   background: var(--color-brand-soft);
-  box-shadow: inset 0 0 0 1px rgb(91 77 247 / 0.08);
+  border: 1px solid rgb(91 77 247 / 0.12);
   color: var(--color-brand);
 }
 
@@ -346,9 +335,7 @@ button:focus-visible {
   border-radius: 18px;
   background: #fff;
   padding: 12px;
-  box-shadow:
-    0 10px 20px rgb(18 19 26 / 0.05),
-    0 3px 10px rgb(18 19 26 / 0.03);
+  box-shadow: none;
 }
 
 .mini-profile-card__row {
@@ -443,8 +430,9 @@ button:focus-visible {
 }
 
 .feature-showcase-section {
+  position: relative;
   border-top: 1px solid var(--color-line);
-  background: var(--color-canvas);
+  background: rgb(247 247 251 / 0.92);
   padding: 118px 0 104px;
 }
 
@@ -484,9 +472,7 @@ button:focus-visible {
   border-radius: 26px;
   background: #f0f1f5;
   padding: 10px;
-  box-shadow:
-    0 18px 48px rgb(18 19 26 / 0.05),
-    inset 0 1px 0 rgb(255 255 255 / 0.9);
+  box-shadow: 0 16px 38px rgb(18 19 26 / 0.035);
 }
 
 .feature-stack {
@@ -505,9 +491,7 @@ button:focus-visible {
   border-radius: 18px;
   background: #fff;
   padding: 22px;
-  box-shadow:
-    0 5px 14px rgb(18 19 26 / 0.035),
-    inset 0 1px 0 rgb(255 255 255 / 0.85);
+  box-shadow: 0 6px 18px rgb(18 19 26 / 0.035);
 }
 
 .feature-tile--not-back,
@@ -565,7 +549,6 @@ button:focus-visible {
   border-radius: 11px;
   background: #fff;
   padding: 8px 9px;
-  box-shadow: 0 5px 12px rgb(18 19 26 / 0.035);
 }
 
 .feature-user-row--muted {
@@ -697,8 +680,9 @@ button:focus-visible {
 }
 
 .workflow-section {
+  position: relative;
   border-top: 1px solid var(--color-line);
-  background: #fff;
+  background: rgb(255 255 255 / 0.92);
   padding: 104px 0 112px;
 }
 
@@ -806,7 +790,6 @@ button:focus-visible {
   border: 1px solid var(--color-line);
   border-radius: 14px;
   background: #fff;
-  box-shadow: 0 10px 24px rgb(18 19 26 / 0.06);
 }
 
 .browser-mini__bar {
@@ -941,7 +924,6 @@ button:focus-visible {
   border-radius: 11px;
   background: #fff;
   padding: 11px 12px;
-  box-shadow: 0 5px 12px rgb(18 19 26 / 0.035);
 }
 
 .result-mini span {
@@ -958,7 +940,11 @@ button:focus-visible {
 .result-mini__danger { color: var(--color-danger); }
 .result-mini__warn { color: var(--color-warn); }
 
-.content-section { padding: 92px 0; }
+.content-section {
+  position: relative;
+  background: rgb(255 255 255 / 0.90);
+  padding: 92px 0;
+}
 
 .split-section {
   display: grid;
@@ -1039,6 +1025,178 @@ footer { border-top: 1px solid var(--color-line); }
   padding-block: 28px;
   color: var(--color-muted);
   font-size: 11px;
+}
+
+.site-content {
+  position: relative;
+  z-index: 1;
+}
+
+.interactive-background {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  background: #fff;
+  pointer-events: none;
+}
+
+.interactive-background__grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgb(18 19 26 / 0.055) 0.8px, transparent 0.9px);
+  background-size: 30px 30px;
+  opacity: 0.42;
+  mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.52) 68%, transparent 100%);
+}
+
+.interactive-background__spotlight {
+  position: absolute;
+  top: -260px;
+  left: -260px;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(91 77 247 / 0.075) 0%, rgb(91 77 247 / 0.03) 34%, transparent 70%);
+  filter: blur(10px);
+  will-change: transform;
+}
+
+footer {
+  position: relative;
+  z-index: 2;
+  background: #fff;
+}
+
+.interactive-surface {
+  transform: translateY(0);
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.announcement > span:last-child {
+  display: inline-block;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.announcement:hover > span:last-child {
+  transform: translateX(3px);
+}
+
+.feature-user-row {
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 180ms ease,
+    opacity 180ms ease;
+}
+
+.privacy-list > div {
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    padding-inline 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.privacy-list > div:hover {
+  background: var(--color-canvas);
+  padding-inline: 10px;
+}
+
+.privacy-list > div:hover dd {
+  color: var(--color-brand);
+}
+
+.primary-cta:active,
+.secondary-cta:active,
+.nav-cta:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+[data-reveal].is-visible .showcase-heading,
+[data-reveal].is-visible .workflow-heading,
+[data-reveal].is-visible .split-section,
+[data-reveal].is-visible .install-box {
+  animation: section-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-reveal].is-visible .feature-tile,
+[data-reveal].is-visible .workflow-card {
+  animation: card-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-reveal].is-visible .feature-stack .feature-tile:first-child,
+[data-reveal].is-visible .workflow-card:nth-of-type(2) {
+  animation-delay: 70ms;
+}
+
+[data-reveal].is-visible .feature-stack .feature-tile:last-child,
+[data-reveal].is-visible .workflow-card:nth-of-type(3) {
+  animation-delay: 140ms;
+}
+
+[data-reveal].is-visible .feature-tile--fans {
+  animation-delay: 110ms;
+}
+
+[data-reveal].is-visible .resume-bar span,
+[data-reveal].is-visible .scan-mini__progress span {
+  animation: progress-fill 760ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: left center;
+}
+
+[data-reveal].is-visible .result-mini > div {
+  animation: result-row 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-reveal].is-visible .result-mini > div:nth-child(2) { animation-delay: 70ms; }
+[data-reveal].is-visible .result-mini > div:nth-child(3) { animation-delay: 140ms; }
+
+@keyframes section-rise {
+  from { opacity: 0.55; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes card-rise {
+  from { opacity: 0.58; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes progress-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes result-row {
+  from { opacity: 0.4; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .interactive-surface:hover {
+    transform: translateY(-5px);
+    border-color: rgb(91 77 247 / 0.18);
+    box-shadow: 0 16px 34px rgb(18 19 26 / 0.07);
+  }
+
+  .feature-user-row:hover {
+    transform: translateX(3px);
+    border-color: rgb(91 77 247 / 0.15);
+    opacity: 1;
+  }
+
+  .workflow-card:hover .browser-mini,
+  .workflow-card:hover .scan-mini,
+  .workflow-card:hover .result-mini {
+    transform: translateY(-2px);
+  }
+}
+
+.browser-mini,
+.scan-mini,
+.result-mini {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (max-width: 760px) {
