@@ -61,6 +61,7 @@ export function canAutoSync(state: ExtensionState, now = Date.now()): boolean {
     state.settings.autoSync
     && state.account
     && state.snapshots.length > 0
+    && !state.scanCheckpoint
     && isSnapshotStale(state, now)
     && !isRateLimitCooldownActive(state, now),
   );
