@@ -1,181 +1,96 @@
-import { useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 
-const views = [
-  {
-    id: 'overview',
-    label: 'Overview',
-    headline: '13',
-    headlineLabel: "don't follow you back",
-    metrics: [
-      { value: '616', label: 'Followers', tone: 'neutral' },
-      { value: '842', label: 'Following', tone: 'neutral' },
-      { value: '408', label: 'Mutual', tone: 'positive' },
-      { value: '21', label: "You don't follow back", tone: 'warn' },
-    ],
-    rows: [
-      ['@marco', 'not following back', true],
-      ['@clara', 'mutual', false],
-      ['@syd', 'follows you', false],
-    ],
-  },
-  {
-    id: 'not-back',
-    label: "Don't follow back",
-    headline: '13',
-    headlineLabel: 'accounts to review',
-    metrics: [
-      { value: '13', label: "Don't follow you back", tone: 'danger' },
-      { value: '3', label: 'new since last check', tone: 'neutral' },
-    ],
-    rows: [
-      ['@marco', 'not following back', true],
-      ['@naya', 'not following back', true],
-      ['@keiko', 'not following back', true],
-    ],
-  },
-  {
-    id: 'mutual',
-    label: 'Mutual',
-    headline: '408',
-    headlineLabel: 'mutual connections',
-    metrics: [
-      { value: '408', label: 'Mutual', tone: 'positive' },
-      { value: '616', label: 'Followers', tone: 'neutral' },
-    ],
-    rows: [
-      ['@clara', 'mutual', false],
-      ['@raka', 'mutual', false],
-      ['@mika', 'mutual', false],
-    ],
-  },
-  {
-    id: 'fans',
-    label: 'You follow',
-    headline: '21',
-    headlineLabel: 'people you do not follow back',
-    metrics: [
-      { value: '21', label: "You don't follow back", tone: 'warn' },
-      { value: '616', label: 'Followers', tone: 'neutral' },
-    ],
-    rows: [
-      ['@syd', 'follows you', false],
-      ['@tariq', 'follows you', false],
-      ['@lena', 'follows you', false],
-    ],
-  },
-] as const;
-
-type ViewId = (typeof views)[number]['id'];
+const ease = [0.22, 1, 0.36, 1] as const;
 
 export function ProductPreview() {
-  const [viewId, setViewId] = useState<ViewId>('overview');
-  const activeView = views.find((view) => view.id === viewId) ?? views[0];
+  const reduceMotion = useReducedMotion();
+
+  const initial = (x: number, y: number, rotate: number) =>
+    reduceMotion ? false : { opacity: 0, x, y, rotate: rotate * 0.45 };
 
   return (
-    <div className="hero-preview-canvas">
-      <div className="proof-card proof-card--before" aria-label="Sample browser session before checking relationships">
-        <span className="proof-card__label">Before</span>
-        <div className="browser-card">
-          <div className="browser-card__bar">
-            <span className="browser-card__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <div className="hero-cards" aria-label="WhoBack product preview">
+      <motion.article
+        className="hero-card hero-card--left"
+        initial={initial(-24, 28, -5)}
+        animate={reduceMotion ? undefined : { opacity: 1, x: 0, y: 0, rotate: -5 }}
+        transition={{ duration: 0.62, delay: 0.12, ease }}
+      >
+        <div className="hero-card__topline">
+          <span>01</span>
+          <span>Ready</span>
+        </div>
+        <div className="hero-card__body hero-card__body--action">
+          <div className="mini-browser">
+            <span className="mini-browser__dot" />
             <span>instagram.com</span>
           </div>
-          <div className="browser-card__body">
-            <div className="browser-card__profile">
-              <div className="browser-card__avatar">H</div>
-              <div>
-                <strong>@howlil</strong>
-                <span>Instagram session open</span>
-              </div>
-            </div>
-            <div className="browser-card__stats">
-              <span><strong>616</strong> followers</span>
-              <span><strong>842</strong> following</span>
-            </div>
-            <div className="browser-card__empty">
-              <span className="browser-card__empty-icon">?</span>
-              <strong>Relationship gap</strong>
-              <span>Not checked yet</span>
-            </div>
+          <button type="button" tabIndex={-1} className="mini-action">Check now</button>
+          <div className="hero-card__copy">
+            <span>START HERE</span>
+            <strong>Keep Instagram open.</strong>
+            <p>WhoBack uses the session that is already signed in to Chrome.</p>
           </div>
         </div>
-      </div>
+      </motion.article>
 
-      <div className="proof-arrow" aria-hidden="true">
-        <span>WhoBack</span>
-        <svg viewBox="0 0 58 24" fill="none"><path d="M2 12h48m0 0-9-9m9 9-9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </div>
-
-      <div className="proof-card proof-card--after">
-        <span className="proof-card__label">After</span>
-        <div className="scan-preview--enter">
-          <div className="scan-preview" role="group" aria-label="Interactive WhoBack extension snapshot">
-        <div className="scan-preview__chrome">
-          <strong>WhoBack</strong>
-          <span>local snapshot</span>
+      <motion.article
+        className="hero-card hero-card--center"
+        initial={initial(0, 36, 0)}
+        animate={reduceMotion ? undefined : { opacity: 1, x: 0, y: 0, rotate: 0 }}
+        transition={{ duration: 0.66, delay: 0.2, ease }}
+      >
+        <div className="hero-card__topline">
+          <span>02</span>
+          <span className="status-dot"><i /> Connected</span>
         </div>
-
-        <div className="scan-preview__body">
-          <div className="scan-preview__account">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="scan-preview__avatar">H</div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">@howlil</p>
-                <p className="mt-0.5 text-[11px] text-muted">Connected</p>
-              </div>
-            </div>
-            <span className="scan-preview__status">ready</span>
-          </div>
-
-          <div className="preview-tabs" role="tablist" aria-label="Sample relationship views">
-            {views.map((view) => (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view.id === viewId}
-                aria-controls="preview-panel"
-                className={`preview-tab focus-ring ${view.id === viewId ? 'preview-tab--active' : ''}`}
-                key={view.id}
-                onClick={() => setViewId(view.id)}
-              >
-                {view.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="preview-panel" id="preview-panel" key={activeView.id} role="tabpanel" aria-live="polite">
-            <div className="preview-result">
-              <strong>{activeView.headline}</strong>
-              <span>{activeView.headlineLabel}</span>
-            </div>
-
-            <div className="scan-metrics" aria-label={`${activeView.label} metrics`}>
-              {activeView.metrics.map((metric) => (
-                <div className={`scan-metric scan-metric--${metric.tone}`} key={metric.label}>
-                  <div className="scan-metric__value">{metric.value}</div>
-                  <div className="scan-metric__label">{metric.label}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="preview-rows" aria-label={`${activeView.label} sample accounts`}>
-              {activeView.rows.map(([handle, relation, signal]) => (
-                <div className="preview-row" key={handle}>
-                  <span>{handle}</span>
-                  <span className={signal ? 'preview-row__signal' : ''}>{relation}</span>
-                </div>
-              ))}
+        <div className="hero-card__body">
+          <div className="account-row">
+            <div className="account-avatar">Y</div>
+            <div>
+              <strong>@youraccount</strong>
+              <span>relationship snapshot</span>
             </div>
           </div>
 
-          <button type="button" className="scan-preview__cta pressable focus-ring" onClick={() => setViewId('not-back')}>
-            View details
-          </button>
-          <div className="scan-preview__footer">Sample interaction · saved in this browser</div>
-        </div>
+          <div className="relation-chips">
+            <span className="relation-chip relation-chip--danger">13 don&apos;t follow back</span>
+            <span className="relation-chip relation-chip--positive">603 mutual</span>
+          </div>
+
+          <div className="hero-card__copy hero-card__copy--center">
+            <span>THE ANSWER</span>
+            <strong>See the gap without profile-by-profile checking.</strong>
           </div>
         </div>
-      </div>
+      </motion.article>
+
+      <motion.article
+        className="hero-card hero-card--right"
+        initial={initial(24, 28, 5)}
+        animate={reduceMotion ? undefined : { opacity: 1, x: 0, y: 0, rotate: 5 }}
+        transition={{ duration: 0.62, delay: 0.28, ease }}
+      >
+        <div className="hero-card__topline">
+          <span>03</span>
+          <span>Local</span>
+        </div>
+        <div className="hero-card__body">
+          <div className="mini-chart" aria-hidden="true">
+            <div className="mini-chart__bar" style={{ height: '38%' }} />
+            <div className="mini-chart__bar" style={{ height: '64%' }} />
+            <div className="mini-chart__bar mini-chart__bar--brand" style={{ height: '82%' }} />
+            <div className="mini-chart__bar" style={{ height: '52%' }} />
+            <div className="mini-chart__bar" style={{ height: '70%' }} />
+            <span className="mini-chart__line" />
+          </div>
+          <div className="hero-card__copy">
+            <span>STAYS WITH YOU</span>
+            <strong>No WhoBack backend.</strong>
+            <p>Scan progress and results stay in extension storage on this browser.</p>
+          </div>
+        </div>
+      </motion.article>
     </div>
   );
 }
