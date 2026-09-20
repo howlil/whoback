@@ -40,6 +40,7 @@ export type SyncPhase =
 export type SyncErrorCode =
   | 'NO_INSTAGRAM_TAB'
   | 'CONTENT_SCRIPT_UNAVAILABLE'
+  | 'INJECTION_FAILED'
   | 'SESSION_EXPIRED'
   | 'ACCOUNT_RESOLVE_FAILED'
   | 'REQUEST_BLOCKED'

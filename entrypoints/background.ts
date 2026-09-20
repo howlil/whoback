@@ -2,6 +2,10 @@ import { browser } from 'wxt/browser';
 import { diffSnapshots } from '../src/domain/relationship';
 import type { ExtensionState, SyncErrorCode } from '../src/domain/types';
 import { isInstagramUsername } from '../src/instagram/profile-identity';
+import {
+  runInstagramMainWorldSync,
+  type MainWorldSyncResult,
+} from '../src/instagram/main-world-sync';
 import type { WhoBackMessage } from '../src/lib/messages';
 import { getState, isSnapshotStale, patchState, setState } from '../src/lib/state';
 
@@ -77,14 +81,14 @@ async function startSync(username?: string) {
   await patchState({
     sync: {
       phase: 'starting',
-      progress: 2,
-      message: 'Connecting to your Instagram session…',
+      progress: 8,
+      message: 'Reading followers and following from Instagram…',
       startedAt: Date.now(),
       tabId: tab.id,
     },
   });
 
-  void dispatchSync(tab.id, expectedUsername);
+  void dispatchMainWorldSync(tab.id, expectedUsername);
 }
 
 async function findInstagramTab() {
@@ -92,29 +96,84 @@ async function findInstagramTab() {
   return [...tabs].sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)))[0];
 }
 
-async function dispatchSync(tabId: number, expectedUsername?: string) {
-  const message = {
-    type: 'RUN_SYNC',
-    expectedUsername,
-  } satisfies WhoBackMessage;
-
+async function dispatchMainWorldSync(tabId: number, expectedUsername?: string) {
   try {
-    await browser.tabs.sendMessage(tabId, message);
+    const result = await executeMainWorldSync(tabId, expectedUsername);
+    await applyMainWorldResult(result);
     return;
   } catch {
-    // A tab kept open across an extension reload can retain an invalidated content-script context.
+    // If the page was mid-navigation, reload once and retry in a fresh document.
   }
 
   try {
     await browser.tabs.reload(tabId);
     await waitForTabComplete(tabId, 15_000);
-    await browser.tabs.sendMessage(tabId, message);
+    const result = await executeMainWorldSync(tabId, expectedUsername);
+    await applyMainWorldResult(result);
   } catch {
     await setSyncError(
-      'CONTENT_SCRIPT_UNAVAILABLE',
-      'WhoBack could not attach to the Instagram tab. Refresh instagram.com and try again.',
+      'INJECTION_FAILED',
+      'WhoBack could not run inside the Instagram page. Reload instagram.com and try again.',
     );
   }
+}
+
+async function executeMainWorldSync(
+  tabId: number,
+  expectedUsername?: string,
+): Promise<MainWorldSyncResult> {
+  const results = await browser.scripting.executeScript({
+    target: { tabId },
+    world: 'MAIN',
+    func: runInstagramMainWorldSync,
+    args: [expectedUsername ?? null],
+  });
+
+  const result = results[0]?.result as MainWorldSyncResult | undefined;
+  if (!result) {
+    throw new Error('Instagram scanner returned no result.');
+  }
+  return result;
+}
+
+async function applyMainWorldResult(result: MainWorldSyncResult) {
+  if (!result.ok) {
+    await setSyncError(result.error.code, result.error.message);
+    return;
+  }
+
+  await patchState({
+    sync: {
+      phase: 'processing',
+      progress: 96,
+      message: 'Comparing relationships…',
+    },
+  });
+
+  const state = await getState();
+  const snapshots = [...state.snapshots, result.snapshot].slice(-30);
+  const previous = snapshots.at(-2);
+  const changes = diffSnapshots(previous, result.snapshot);
+  const badgeCount = changes.newFollowers.length + changes.unfollowers.length;
+
+  await setState({
+    ...state,
+    account: {
+      ...state.account,
+      username: result.account.username,
+      platformUserId: result.account.platformUserId,
+      detectedAt: result.account.detectedAt,
+    },
+    snapshots,
+    sync: {
+      phase: 'complete',
+      progress: 100,
+      message: 'Up to date',
+      finishedAt: Date.now(),
+    },
+  });
+
+  await updateBadge(badgeCount, state.settings.showBadge);
 }
 
 async function waitForTabComplete(tabId: number, timeoutMs: number) {
@@ -154,9 +213,6 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
       await startSync();
       return { ok: true };
     }
-
-    case 'RUN_SYNC':
-      return { ok: false };
 
     case 'SYNC_PROGRESS': {
       const state = await getState();
