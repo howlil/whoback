@@ -49,7 +49,7 @@ export async function runInstagramMainWorldSync(
   };
 
   const sleep = (ms: number) =>
-    new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+    new Promise<void>((resolve) => globalThis.setTimeout(resolve, ms));
 
   const fail = (
     code: SyncErrorCode,
