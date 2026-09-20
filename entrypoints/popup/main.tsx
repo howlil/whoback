@@ -123,7 +123,7 @@ function Popup() {
   const changes = latest ? diffSnapshots(previous, latest) : null;
   const checkpoint = state.scanCheckpoint;
   const resumable = Boolean(checkpoint);
-  const busy = ['starting', 'followers', 'following', 'processing'].includes(state.sync.phase);
+  const busy = ['starting', 'planning', 'followers', 'following', 'verifying', 'processing'].includes(state.sync.phase);
   const cooldownActive = Boolean(state.sync.cooldownUntil && state.sync.cooldownUntil > Date.now());
   const cooldownMinutes = cooldownActive
     ? Math.max(1, Math.ceil(((state.sync.cooldownUntil ?? 0) - Date.now()) / 60_000))
@@ -209,7 +209,7 @@ function Popup() {
 
           {analysis ? <>
             <div className="mt-4 grid grid-cols-2 gap-2"><MetricCard value={analysis.followersCount} label="Followers"/><MetricCard value={analysis.followingCount} label="Following"/><MetricCard value={analysis.mutual.length} label="Mutual" tone="positive"/><MetricCard value={analysis.notFollowingBack.length} label="Don't follow you back" tone="danger"/><MetricCard value={analysis.youDontFollowBack.length} label="You don't follow back" tone="warn"/></div>
-            {changes && previous && <div className="mt-3 flex gap-2 text-[11px]"><span className="rounded-full bg-positive-soft px-2 py-1 font-medium text-positive">+{changes.newFollowers.length} new</span><span className="rounded-full bg-danger-soft px-2 py-1 font-medium text-danger">−{changes.unfollowers.length} unfollowed</span></div>}
+            {changes && previous && changes.followersComplete && <div className="mt-3 flex gap-2 text-[11px]"><span className="rounded-full bg-positive-soft px-2 py-1 font-medium text-positive">+{changes.newFollowers.length} new</span><span className="rounded-full bg-danger-soft px-2 py-1 font-medium text-danger">−{changes.unfollowers.length} unfollowed</span></div>}
             <button className="focus-ring mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#17143f] px-4 py-3 text-sm font-semibold text-white hover:bg-[#211d55]" onClick={openSidePanel}>View details <ArrowIcon className="size-4" /></button>
           </> : !busy && <div className="mt-4 rounded-xl border border-dashed border-line p-4 text-center"><p className="text-sm font-medium">Ready for your first check</p><p className="mt-1 text-xs leading-5 text-muted">WhoBack reads followers and following through your existing Instagram session.</p><button disabled={cooldownActive} className="focus-ring mt-3 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40" onClick={startSync}>{cooldownActive ? `Resume in ~${cooldownMinutes} min` : resumable ? 'Resume scan' : 'Check now'}</button></div>}
 
