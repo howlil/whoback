@@ -2,12 +2,15 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Logo from '../components/Logo.astro';
 import { ProductPreview } from '../components/ProductPreview';
+import { InteractiveBackground } from '../components/InteractiveBackground';
 
 const releaseUrl = 'https://github.com/howlil/whoback/releases/latest';
 const repoUrl = 'https://github.com/howlil/whoback';
 ---
 
 <BaseLayout>
+  <InteractiveBackground client:load />
+
   <header class="floating-header">
     <div class="compact-nav">
       <Logo />
@@ -24,13 +27,13 @@ const repoUrl = 'https://github.com/howlil/whoback';
   <main>
     <section class="reference-hero">
       <div class="page-shell">
-        <div class="announcement">
+        <div class="announcement" data-reveal>
           <span>New</span>
           <p>v1.1 adds adaptive scans and recoverable resume</p>
           <span aria-hidden="true">→</span>
         </div>
 
-        <div class="hero-copy">
+        <div class="hero-copy" data-reveal>
           <h1>
             See who <mark>follows you back</mark><br />
             without handing over your password.
@@ -50,14 +53,14 @@ const repoUrl = 'https://github.com/howlil/whoback';
 
     <section id="product" class="feature-showcase-section">
       <div class="page-shell">
-        <div class="showcase-heading">
+        <div class="showcase-heading" data-reveal>
           <p class="section-kicker">Product features</p>
           <h2>The relationship views that matter.</h2>
           <p>See one-way follows, mutuals, and recoverable scan progress without checking profiles one by one.</p>
         </div>
 
-        <div class="feature-board">
-          <article class="feature-tile feature-tile--not-back">
+        <div class="feature-board" data-reveal>
+          <article class="feature-tile interactive-card feature-tile--not-back">
             <div class="feature-tile__eyebrow">
               <span class="feature-dot feature-dot--danger"></span>
               Primary view
@@ -88,7 +91,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
           </article>
 
           <div class="feature-stack">
-            <article class="feature-tile feature-tile--mutual">
+            <article class="feature-tile interactive-card feature-tile--mutual">
               <div class="feature-tile__eyebrow">
                 <span class="feature-dot feature-dot--positive"></span>
                 Mutual
@@ -97,7 +100,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
               <p>People you follow who follow you back.</p>
             </article>
 
-            <article class="feature-tile feature-tile--resume">
+            <article class="feature-tile interactive-card feature-tile--resume">
               <div class="resume-status">
                 <span class="resume-icon">↻</span>
                 <div><strong>Progress saved</strong><small>616 following scanned</small></div>
@@ -110,7 +113,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </article>
           </div>
 
-          <article class="feature-tile feature-tile--fans">
+          <article class="feature-tile interactive-card feature-tile--fans">
             <div class="feature-tile__eyebrow">
               <span class="feature-dot feature-dot--warn"></span>
               Full scan
@@ -131,13 +134,13 @@ const repoUrl = 'https://github.com/howlil/whoback';
 
     <section id="how" class="workflow-section">
       <div class="page-shell">
-        <div class="workflow-heading">
+        <div class="workflow-heading" data-reveal>
           <p class="section-kicker">How it works</p>
           <h2>Check your follow relationships in <mark>3 simple steps</mark></h2>
           <p>Keep Instagram signed in, run WhoBack, then inspect the relationship result.</p>
         </div>
 
-        <div class="workflow-cards">
+        <div class="workflow-cards" data-reveal>
           <div class="workflow-step-label workflow-step-label--one">
             <span>Step 1</span>
             <svg viewBox="0 0 58 34" aria-hidden="true">
@@ -145,7 +148,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </svg>
           </div>
 
-          <article class="workflow-card">
+          <article class="workflow-card interactive-card">
             <div class="workflow-visual workflow-visual--instagram">
               <div class="browser-mini">
                 <div class="browser-mini__bar"><span></span><span></span><span></span><b>instagram.com</b></div>
@@ -169,7 +172,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </svg>
           </div>
 
-          <article class="workflow-card">
+          <article class="workflow-card interactive-card">
             <div class="workflow-visual workflow-visual--scan">
               <div class="scan-mini">
                 <div class="scan-mini__header"><strong>WhoBack</strong><span>Scanning</span></div>
@@ -191,7 +194,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </svg>
           </div>
 
-          <article class="workflow-card">
+          <article class="workflow-card interactive-card">
             <div class="workflow-visual workflow-visual--result">
               <div class="result-mini">
                 <div><span>Mutual</span><strong class="result-mini__positive">603</strong></div>
@@ -209,7 +212,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
     </section>
 
     <section id="privacy" class="content-section">
-      <div class="page-shell split-section">
+      <div class="page-shell split-section" data-reveal>
         <div>
           <p class="section-kicker">Privacy</p>
           <h2>Small data contract. Easy to inspect.</h2>
@@ -225,7 +228,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
     </section>
 
     <section class="install-section">
-      <div class="page-shell install-box">
+      <div class="page-shell install-box" data-reveal>
         <div>
           <p class="section-kicker">Install</p>
           <h2>Get the latest release from GitHub.</h2>
@@ -242,4 +245,38 @@ const repoUrl = 'https://github.com/howlil/whoback';
       <span>Independent project · not affiliated with Instagram or Meta</span>
     </div>
   </footer>
+
+  <script>
+    const revealTargets = document.querySelectorAll<HTMLElement>('[data-reveal]');
+
+    const revealObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          (entry.target as HTMLElement).dataset.visible = 'true';
+          revealObserver.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.16, rootMargin: '0px 0px -6% 0px' },
+    );
+
+    revealTargets.forEach((element) => revealObserver.observe(element));
+
+    const cards = document.querySelectorAll<HTMLElement>('.interactive-card');
+    cards.forEach((card) => {
+      card.addEventListener('pointermove', (event) => {
+        if (event.pointerType && event.pointerType !== 'mouse' && event.pointerType !== 'pen') return;
+        const rect = card.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width - 0.5;
+        const y = (event.clientY - rect.top) / rect.height - 0.5;
+        card.style.setProperty('--card-rx', `${(-y * 1.5).toFixed(2)}deg`);
+        card.style.setProperty('--card-ry', `${(x * 1.5).toFixed(2)}deg`);
+      });
+
+      card.addEventListener('pointerleave', () => {
+        card.style.removeProperty('--card-rx');
+        card.style.removeProperty('--card-ry');
+      });
+    });
+  </script>
 </BaseLayout>
