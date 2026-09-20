@@ -7,6 +7,11 @@ export interface InstagramAccount {
   detectedAt: number;
 }
 
+export interface InstagramUserRef {
+  id: string;
+  username: string;
+}
+
 export interface RelationshipSnapshot {
   capturedAt: number;
   followers: string[];
@@ -28,6 +33,27 @@ export interface RelationshipChanges {
   youUnfollowed: string[];
 }
 
+export type ScanCheckpointPhase = 'following' | 'followers';
+
+export interface ScanCheckpointList {
+  users: InstagramUserRef[];
+  cursor?: string;
+  done: boolean;
+  pages: number;
+}
+
+export interface ScanCheckpoint {
+  version: 1;
+  accountId: string;
+  username?: string;
+  phase: ScanCheckpointPhase;
+  following: ScanCheckpointList;
+  followers: ScanCheckpointList;
+  requestCount: number;
+  startedAt: number;
+  updatedAt: number;
+}
+
 export type SyncPhase =
   | 'idle'
   | 'starting'
@@ -42,6 +68,7 @@ export type SyncErrorCode =
   | 'CONTENT_SCRIPT_UNAVAILABLE'
   | 'INJECTION_FAILED'
   | 'SESSION_EXPIRED'
+  | 'SESSION_ID_MISSING'
   | 'ACCOUNT_RESOLVE_FAILED'
   | 'REQUEST_BLOCKED'
   | 'RATE_LIMITED'
@@ -73,6 +100,7 @@ export interface Settings {
 export interface ExtensionState {
   account: InstagramAccount | null;
   snapshots: RelationshipSnapshot[];
+  scanCheckpoint?: ScanCheckpoint;
   sync: SyncState;
   settings: Settings;
 }
