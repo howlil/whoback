@@ -237,7 +237,7 @@ async function runAdaptiveSync(
           await finishFailure(counts, checkpoint);
           return;
         }
-      } else {
+      } else if (counts.kind === 'counts') {
         checkpoint.followingTotal = counts.followingTotal;
         checkpoint.followersTotal = counts.followersTotal;
         await persistCheckpoint(checkpoint);
@@ -516,6 +516,8 @@ async function verifyFollowing(
     if (!isCurrentRun(runId)) return false;
 
     const user = pending[index];
+    if (!user) continue;
+
     const result = await executeOperation(tabId, {
       kind: 'relationship',
       viewerId,
