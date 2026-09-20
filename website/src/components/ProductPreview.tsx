@@ -1,94 +1,181 @@
-import { motion, useReducedMotion } from 'motion/react';
+import { useState } from 'react';
 
-const metrics = [
-  { value: '1,431', label: 'Followers', tone: 'bg-[#f7f7fa] text-[#12131a]' },
-  { value: '616', label: 'Following', tone: 'bg-[#f7f7fa] text-[#12131a]' },
-  { value: '603', label: 'Mutual', tone: 'bg-[#eef9f1] text-[#248a4b]' },
-  { value: '13', label: "Don't follow you back", tone: 'bg-[#fff1f2] text-[#e23943]' },
-  { value: '828', label: "You don't follow back", tone: 'bg-[#fff7e8] text-[#d97706]' },
-];
+const views = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    headline: '13',
+    headlineLabel: "don't follow you back",
+    metrics: [
+      { value: '616', label: 'Followers', tone: 'neutral' },
+      { value: '842', label: 'Following', tone: 'neutral' },
+      { value: '408', label: 'Mutual', tone: 'positive' },
+      { value: '21', label: "You don't follow back", tone: 'warn' },
+    ],
+    rows: [
+      ['@marco', 'not following back', true],
+      ['@clara', 'mutual', false],
+      ['@syd', 'follows you', false],
+    ],
+  },
+  {
+    id: 'not-back',
+    label: "Don't follow back",
+    headline: '13',
+    headlineLabel: 'accounts to review',
+    metrics: [
+      { value: '13', label: "Don't follow you back", tone: 'danger' },
+      { value: '3', label: 'new since last check', tone: 'neutral' },
+    ],
+    rows: [
+      ['@marco', 'not following back', true],
+      ['@naya', 'not following back', true],
+      ['@keiko', 'not following back', true],
+    ],
+  },
+  {
+    id: 'mutual',
+    label: 'Mutual',
+    headline: '408',
+    headlineLabel: 'mutual connections',
+    metrics: [
+      { value: '408', label: 'Mutual', tone: 'positive' },
+      { value: '616', label: 'Followers', tone: 'neutral' },
+    ],
+    rows: [
+      ['@clara', 'mutual', false],
+      ['@raka', 'mutual', false],
+      ['@mika', 'mutual', false],
+    ],
+  },
+  {
+    id: 'fans',
+    label: 'You follow',
+    headline: '21',
+    headlineLabel: 'people you do not follow back',
+    metrics: [
+      { value: '21', label: "You don't follow back", tone: 'warn' },
+      { value: '616', label: 'Followers', tone: 'neutral' },
+    ],
+    rows: [
+      ['@syd', 'follows you', false],
+      ['@tariq', 'follows you', false],
+      ['@lena', 'follows you', false],
+    ],
+  },
+] as const;
+
+type ViewId = (typeof views)[number]['id'];
 
 export function ProductPreview() {
-  const reduceMotion = useReducedMotion();
+  const [viewId, setViewId] = useState<ViewId>('overview');
+  const activeView = views.find((view) => view.id === viewId) ?? views[0];
 
   return (
-    <motion.div
-      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-      animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="mx-auto w-full max-w-[410px]"
-    >
-      <div className="rounded-[28px] border border-[#e8e9ef] bg-[#f7f7fb] p-3 shadow-[0_24px_70px_rgba(20,22,38,0.12)]">
-        <div className="overflow-hidden rounded-[21px] border border-[#e8e9ef] bg-white">
-          <div className="flex items-center justify-between border-b border-[#e8e9ef] px-4 py-3">
-            <div className="flex items-center gap-2.5">
-              <div className="grid size-9 place-items-center rounded-xl bg-[#17143f] text-white">
-                <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
-                  <path d="M9.5 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7-1a3 3 0 1 0 0-6M4 19c0-3.04 2.46-5.5 5.5-5.5S15 15.96 15 19m2-5.5c2.76 0 5 2.24 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <span className="text-[17px] font-semibold tracking-[-0.025em]">WhoBack</span>
-            </div>
-            <span className="grid size-8 place-items-center rounded-lg border border-[#e8e9ef] text-[#727586]">
-              <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
-                <path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42m0-12.72-1.42 1.42M7.06 16.94l-1.42 1.42" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
-                <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.7"/>
-              </svg>
-            </span>
+    <div className="hero-preview-canvas">
+      <div className="proof-card proof-card--before" aria-label="Sample browser session before checking relationships">
+        <span className="proof-card__label">Before</span>
+        <div className="browser-card">
+          <div className="browser-card__bar">
+            <span className="browser-card__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span>instagram.com</span>
           </div>
-
-          <div className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-full bg-[#17143f] text-xs font-semibold text-white">Y</div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">@youraccount</div>
-                <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[#727586]">
-                  <span className="size-1.5 rounded-full bg-emerald-500" />
-                  Connected
-                </div>
-              </div>
-              <div className="grid size-8 place-items-center rounded-lg border border-[#e8e9ef] text-[#727586]">
-                <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
-                  <path d="M4 4v6h6M20 20v-6h-6M5.2 15A7 7 0 0 0 18 17m.8-8A7 7 0 0 0 6 7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+          <div className="browser-card__body">
+            <div className="browser-card__profile">
+              <div className="browser-card__avatar">H</div>
+              <div>
+                <strong>@howlil</strong>
+                <span>Instagram session open</span>
               </div>
             </div>
-
-            <motion.div
-              initial={reduceMotion ? false : 'hidden'}
-              animate={reduceMotion ? undefined : 'show'}
-              variants={{
-                hidden: {},
-                show: { transition: { staggerChildren: 0.06, delayChildren: 0.18 } },
-              }}
-              className="mt-4 grid grid-cols-2 gap-2"
-            >
-              {metrics.map((metric) => (
-                <motion.div
-                  key={metric.label}
-                  variants={{
-                    hidden: { opacity: 0, y: 8 },
-                    show: { opacity: 1, y: 0 },
-                  }}
-                  transition={{ duration: 0.3 }}
-                  className={`rounded-xl p-3 ${metric.tone}`}
-                >
-                  <div className="text-xl font-semibold tracking-[-0.03em] tabular-nums">{metric.value}</div>
-                  <div className="mt-0.5 text-[11px] font-medium leading-tight opacity-80">{metric.label}</div>
-                </motion.div>
-              ))}
-            </motion.div>
-
-            <div className="mt-4 flex h-11 items-center justify-center rounded-xl bg-[#17143f] text-sm font-semibold text-white">
-              View details
-              <svg viewBox="0 0 20 20" className="ml-2 size-4" fill="none" aria-hidden="true">
-                <path d="M4 10h11m-4-4 4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+            <div className="browser-card__stats">
+              <span><strong>616</strong> followers</span>
+              <span><strong>842</strong> following</span>
             </div>
-            <p className="mt-3 text-center text-[10px] text-[#727586]">Product preview</p>
+            <div className="browser-card__empty">
+              <span className="browser-card__empty-icon">?</span>
+              <strong>Relationship gap</strong>
+              <span>Not checked yet</span>
+            </div>
           </div>
         </div>
       </div>
-    </motion.div>
+
+      <div className="proof-arrow" aria-hidden="true">
+        <span>WhoBack</span>
+        <svg viewBox="0 0 58 24" fill="none"><path d="M2 12h48m0 0-9-9m9 9-9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </div>
+
+      <div className="proof-card proof-card--after">
+        <span className="proof-card__label">After</span>
+        <div className="scan-preview--enter">
+          <div className="scan-preview" role="group" aria-label="Interactive WhoBack extension snapshot">
+        <div className="scan-preview__chrome">
+          <strong>WhoBack</strong>
+          <span>local snapshot</span>
+        </div>
+
+        <div className="scan-preview__body">
+          <div className="scan-preview__account">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="scan-preview__avatar">H</div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">@howlil</p>
+                <p className="mt-0.5 text-[11px] text-muted">Connected</p>
+              </div>
+            </div>
+            <span className="scan-preview__status">ready</span>
+          </div>
+
+          <div className="preview-tabs" role="tablist" aria-label="Sample relationship views">
+            {views.map((view) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view.id === viewId}
+                aria-controls="preview-panel"
+                className={`preview-tab focus-ring ${view.id === viewId ? 'preview-tab--active' : ''}`}
+                key={view.id}
+                onClick={() => setViewId(view.id)}
+              >
+                {view.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="preview-panel" id="preview-panel" key={activeView.id} role="tabpanel" aria-live="polite">
+            <div className="preview-result">
+              <strong>{activeView.headline}</strong>
+              <span>{activeView.headlineLabel}</span>
+            </div>
+
+            <div className="scan-metrics" aria-label={`${activeView.label} metrics`}>
+              {activeView.metrics.map((metric) => (
+                <div className={`scan-metric scan-metric--${metric.tone}`} key={metric.label}>
+                  <div className="scan-metric__value">{metric.value}</div>
+                  <div className="scan-metric__label">{metric.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="preview-rows" aria-label={`${activeView.label} sample accounts`}>
+              {activeView.rows.map(([handle, relation, signal]) => (
+                <div className="preview-row" key={handle}>
+                  <span>{handle}</span>
+                  <span className={signal ? 'preview-row__signal' : ''}>{relation}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button type="button" className="scan-preview__cta pressable focus-ring" onClick={() => setViewId('not-back')}>
+            View details
+          </button>
+          <div className="scan-preview__footer">Sample interaction · saved in this browser</div>
+        </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
