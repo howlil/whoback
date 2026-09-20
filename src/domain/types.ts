@@ -61,6 +61,7 @@ export interface SyncState {
   startedAt?: number;
   finishedAt?: number;
   tabId?: number;
+  cooldownUntil?: number;
 }
 
 export interface Settings {
