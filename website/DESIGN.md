@@ -47,7 +47,7 @@ recognize the product before installing it:
   family; it is a presentation layer, not a new semantic token.
 - `#176B3D`, `#B42330`, and `#925400` are positive, danger, and warning
   states used in metric surfaces and recovery messaging.
-- Inter is the only type family, matching the extension.
+- Inter is used for interface text; Georgia is reserved for large editorial headings so the landing page has one clear display style.
 - Surface cards use the extension's line, radius, and `0 10px 30px` shadow
   recipe. Layout is compact and product-led rather than editorial.
 - The hero is intentionally airy and high-contrast: dark ink headline, white
