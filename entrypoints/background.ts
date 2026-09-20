@@ -7,7 +7,13 @@ import {
   type MainWorldSyncResult,
 } from '../src/instagram/main-world-sync';
 import type { WhoBackMessage } from '../src/lib/messages';
-import { getState, isSnapshotStale, patchState, setState } from '../src/lib/state';
+import {
+  canAutoSync,
+  getState,
+  isRateLimitCooldownActive,
+  patchState,
+  setState,
+} from '../src/lib/state';
 
 const ALARM = 'whoback-auto-sync';
 
@@ -53,10 +59,8 @@ async function sanitizePersistedAccount() {
 
 async function maybeAutoSync() {
   const state = await getState();
-  if (!state.settings.autoSync || !state.account || !isSnapshotStale(state) || isBusy(state)) {
-    return;
-  }
-  await startSync(state.account.username);
+  if (!canAutoSync(state) || isBusy(state)) return;
+  await startSync(state.account?.username);
 }
 
 function isBusy(state: ExtensionState) {
@@ -68,6 +72,17 @@ async function startSync(username?: string) {
   const expectedUsername = username ?? state.account?.username;
 
   if (isBusy(state)) return;
+
+  if (isRateLimitCooldownActive(state)) {
+    const remainingMs = Math.max(0, (state.sync.cooldownUntil ?? 0) - Date.now());
+    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+    await setSyncError(
+      'RATE_LIMITED',
+      `Instagram is still cooling down. Try again in about ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}.`,
+      state.sync.cooldownUntil,
+    );
+    return;
+  }
 
   const tab = await findInstagramTab();
   if (!tab?.id) {
@@ -85,6 +100,7 @@ async function startSync(username?: string) {
       message: 'Reading followers and following from Instagram…',
       startedAt: Date.now(),
       tabId: tab.id,
+      cooldownUntil: undefined,
     },
   });
 
@@ -138,7 +154,11 @@ async function executeMainWorldSync(
 
 async function applyMainWorldResult(result: MainWorldSyncResult) {
   if (!result.ok) {
-    await setSyncError(result.error.code, result.error.message);
+    const cooldownUntil = result.error.code === 'RATE_LIMITED'
+      ? Date.now() + (result.error.retryAfterMs ?? 15 * 60 * 1000)
+      : undefined;
+
+    await setSyncError(result.error.code, result.error.message, cooldownUntil);
     return;
   }
 
@@ -147,6 +167,7 @@ async function applyMainWorldResult(result: MainWorldSyncResult) {
       phase: 'processing',
       progress: 96,
       message: 'Comparing relationships…',
+      cooldownUntil: undefined,
     },
   });
 
@@ -203,7 +224,7 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
       if (!isInstagramUsername(message.account.username)) return { ok: false };
 
       const state = await patchState({ account: message.account });
-      if (state.settings.autoSync && isSnapshotStale(state) && !isBusy(state)) {
+      if (canAutoSync(state) && !isBusy(state)) {
         void startSync(message.account.username);
       }
       return { ok: true };
@@ -265,7 +286,11 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
   }
 }
 
-async function setSyncError(code: SyncErrorCode, message: string) {
+async function setSyncError(
+  code: SyncErrorCode,
+  message: string,
+  cooldownUntil?: number,
+) {
   const state = await getState();
   await patchState({
     sync: {
@@ -275,6 +300,7 @@ async function setSyncError(code: SyncErrorCode, message: string) {
       errorCode: code,
       message,
       finishedAt: Date.now(),
+      cooldownUntil,
     },
   });
 }
