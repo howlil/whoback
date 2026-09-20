@@ -247,6 +247,8 @@ const repoUrl = 'https://github.com/howlil/whoback';
   </footer>
 
   <script>
+    document.documentElement.dataset.motion = 'ready';
+
     const revealTargets = document.querySelectorAll<HTMLElement>('[data-reveal]');
 
     const revealObserver = new IntersectionObserver(
