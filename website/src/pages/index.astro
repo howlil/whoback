@@ -2,12 +2,17 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Logo from '../components/Logo.astro';
 import { ProductPreview } from '../components/ProductPreview';
+import { InteractiveBackground } from '../components/InteractiveBackground';
+import { PageInteractions } from '../components/PageInteractions';
 
 const releaseUrl = 'https://github.com/howlil/whoback/releases/latest';
 const repoUrl = 'https://github.com/howlil/whoback';
 ---
 
 <BaseLayout>
+  <InteractiveBackground client:load />
+  <PageInteractions client:load />
+
   <header class="floating-header">
     <div class="compact-nav">
       <Logo />
@@ -21,7 +26,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
     </div>
   </header>
 
-  <main>
+  <main class="site-content">
     <section class="reference-hero">
       <div class="page-shell">
         <div class="announcement">
@@ -48,7 +53,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
       </div>
     </section>
 
-    <section id="product" class="feature-showcase-section">
+    <section id="product" class="feature-showcase-section" data-reveal>
       <div class="page-shell">
         <div class="showcase-heading">
           <p class="section-kicker">Product features</p>
@@ -57,7 +62,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
         </div>
 
         <div class="feature-board">
-          <article class="feature-tile feature-tile--not-back">
+          <article class="feature-tile interactive-surface feature-tile--not-back">
             <div class="feature-tile__eyebrow">
               <span class="feature-dot feature-dot--danger"></span>
               Primary view
@@ -88,16 +93,16 @@ const repoUrl = 'https://github.com/howlil/whoback';
           </article>
 
           <div class="feature-stack">
-            <article class="feature-tile feature-tile--mutual">
+            <article class="feature-tile interactive-surface feature-tile--mutual">
               <div class="feature-tile__eyebrow">
                 <span class="feature-dot feature-dot--positive"></span>
                 Mutual
               </div>
-              <div class="feature-stat feature-stat--positive">603</div>
+              <div class="feature-stat feature-stat--positive" data-count="603">603</div>
               <p>People you follow who follow you back.</p>
             </article>
 
-            <article class="feature-tile feature-tile--resume">
+            <article class="feature-tile interactive-surface feature-tile--resume">
               <div class="resume-status">
                 <span class="resume-icon">↻</span>
                 <div><strong>Progress saved</strong><small>616 following scanned</small></div>
@@ -110,13 +115,13 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </article>
           </div>
 
-          <article class="feature-tile feature-tile--fans">
+          <article class="feature-tile interactive-surface feature-tile--fans">
             <div class="feature-tile__eyebrow">
               <span class="feature-dot feature-dot--warn"></span>
               Full scan
             </div>
             <div>
-              <div class="feature-stat feature-stat--warn">828</div>
+              <div class="feature-stat feature-stat--warn" data-count="828">828</div>
               <div class="feature-stat-caption">accounts</div>
             </div>
             <div class="feature-tile__copy">
@@ -129,7 +134,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
       </div>
     </section>
 
-    <section id="how" class="workflow-section">
+    <section id="how" class="workflow-section" data-reveal>
       <div class="page-shell">
         <div class="workflow-heading">
           <p class="section-kicker">How it works</p>
@@ -145,7 +150,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </svg>
           </div>
 
-          <article class="workflow-card">
+          <article class="workflow-card interactive-surface">
             <div class="workflow-visual workflow-visual--instagram">
               <div class="browser-mini">
                 <div class="browser-mini__bar"><span></span><span></span><span></span><b>instagram.com</b></div>
@@ -169,7 +174,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </svg>
           </div>
 
-          <article class="workflow-card">
+          <article class="workflow-card interactive-surface">
             <div class="workflow-visual workflow-visual--scan">
               <div class="scan-mini">
                 <div class="scan-mini__header"><strong>WhoBack</strong><span>Scanning</span></div>
@@ -191,7 +196,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
             </svg>
           </div>
 
-          <article class="workflow-card">
+          <article class="workflow-card interactive-surface">
             <div class="workflow-visual workflow-visual--result">
               <div class="result-mini">
                 <div><span>Mutual</span><strong class="result-mini__positive">603</strong></div>
@@ -208,7 +213,7 @@ const repoUrl = 'https://github.com/howlil/whoback';
       </div>
     </section>
 
-    <section id="privacy" class="content-section">
+    <section id="privacy" class="content-section" data-reveal>
       <div class="page-shell split-section">
         <div>
           <p class="section-kicker">Privacy</p>
@@ -224,8 +229,8 @@ const repoUrl = 'https://github.com/howlil/whoback';
       </div>
     </section>
 
-    <section class="install-section">
-      <div class="page-shell install-box">
+    <section class="install-section" data-reveal>
+      <div class="page-shell install-box interactive-surface">
         <div>
           <p class="section-kicker">Install</p>
           <h2>Get the latest release from GitHub.</h2>
