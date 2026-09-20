@@ -2,7 +2,6 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Logo from '../components/Logo.astro';
 import { PageInteractions } from '../components/PageInteractions';
-import { ProductPreview } from '../components/ProductPreview';
 import {
   ArrowDown,
   ArrowLeftRight,
@@ -63,11 +62,7 @@ const avatarImages = {
               Get WhoBack <span class="cta-icon" aria-hidden="true"><ArrowRight size={17} strokeWidth={1.8} /></span>
             </a>
           </div>
-          <span class="hero-install-note">Chrome extension · install locally from GitHub</span>
         </div>
-
-        <ProductPreview client:load />
-        <p class="hero-proof-note">Illustrative preview · local browser workflow · no account connected</p>
 
         <div class="hero-trust" aria-label="WhoBack benefits">
           <span>Works in your browser</span>
