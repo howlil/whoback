@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ExtensionState } from '../src/domain/types';
+import type { ExtensionState, ScanCheckpoint } from '../src/domain/types';
 import { canAutoSync, isRateLimitCooldownActive } from '../src/lib/state';
 
 function makeState(overrides: Partial<ExtensionState> = {}): ExtensionState {
@@ -16,6 +16,29 @@ function makeState(overrides: Partial<ExtensionState> = {}): ExtensionState {
   };
 }
 
+function checkpoint(): ScanCheckpoint {
+  return {
+    version: 1,
+    accountId: '123',
+    username: 'mraulabsr',
+    phase: 'following',
+    following: {
+      users: [{ id: '1', username: 'alice' }],
+      cursor: 'next',
+      done: false,
+      pages: 1,
+    },
+    followers: {
+      users: [],
+      done: false,
+      pages: 0,
+    },
+    requestCount: 1,
+    startedAt: 1,
+    updatedAt: 2,
+  };
+}
+
 describe('sync guards', () => {
   it('never auto-syncs before the first successful manual snapshot', () => {
     expect(canAutoSync(makeState(), 10_000)).toBe(false);
@@ -28,6 +51,16 @@ describe('sync guards', () => {
     });
 
     expect(canAutoSync(state, day + 2)).toBe(true);
+  });
+
+  it('requires manual resume while a checkpoint exists', () => {
+    const day = 24 * 60 * 60 * 1000;
+    const state = makeState({
+      snapshots: [{ capturedAt: 1, followers: [], following: [] }],
+      scanCheckpoint: checkpoint(),
+    });
+
+    expect(canAutoSync(state, day + 2)).toBe(false);
   });
 
   it('blocks automatic sync during a rate-limit cooldown', () => {

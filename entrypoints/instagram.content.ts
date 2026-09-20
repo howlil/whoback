@@ -1,11 +1,25 @@
 import { browser } from 'wxt/browser';
 import { detectCurrentAccount } from '../src/instagram/detect-account';
-import type { InstagramAccount } from '../src/domain/types';
+import type { InstagramAccount, ScanCheckpoint, SyncPhase } from '../src/domain/types';
 import type { WhoBackMessage } from '../src/lib/messages';
+
+type MainWorldBridgeMessage =
+  | {
+      source: 'whoback-main';
+      type: 'checkpoint';
+      checkpoint: ScanCheckpoint;
+    }
+  | {
+      source: 'whoback-main';
+      type: 'progress';
+      phase: Extract<SyncPhase, 'followers' | 'following'>;
+      progress: number;
+      message: string;
+    };
 
 export default defineContentScript({
   matches: ['https://www.instagram.com/*'],
-  runAt: 'document_idle',
+  runAt: 'document_start',
   async main() {
     let lastUsername = '';
 
@@ -23,7 +37,32 @@ export default defineContentScript({
       return sendDetectedAccount(detectCurrentAccount());
     };
 
-    await reportAccountFromDom();
+    window.addEventListener('message', (event: MessageEvent<MainWorldBridgeMessage>) => {
+      if (event.source !== window || event.data?.source !== 'whoback-main') return;
+
+      if (event.data.type === 'checkpoint') {
+        void browser.runtime.sendMessage({
+          type: 'SCAN_CHECKPOINT',
+          checkpoint: event.data.checkpoint,
+        } satisfies WhoBackMessage);
+        return;
+      }
+
+      if (event.data.type === 'progress') {
+        void browser.runtime.sendMessage({
+          type: 'SYNC_PROGRESS',
+          phase: event.data.phase,
+          progress: event.data.progress,
+          message: event.data.message,
+        } satisfies WhoBackMessage);
+      }
+    });
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => void reportAccountFromDom(), { once: true });
+    } else {
+      await reportAccountFromDom();
+    }
 
     const observer = new MutationObserver(() => {
       void reportAccountFromDom();
