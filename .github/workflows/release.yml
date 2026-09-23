@@ -77,12 +77,12 @@ jobs:
           - Resume interrupted scans without restarting from page 1.
 
           ### Install
-          1. Download `whoback-chrome.tar.gz` or `whoback-chrome-$TAG.zip` from Assets below.
+          1. Download whoback-chrome.tar.gz or whoback-chrome-$TAG.zip from Assets below.
           2. Extract the archive.
-          3. Open `chrome://extensions` in Chrome.
+          3. Open chrome://extensions in Chrome.
           4. Enable Developer mode.
           5. Click Load unpacked.
-          6. Select the extracted folder containing `manifest.json`.
+          6. Select the extracted folder containing manifest.json.
 
           ### Privacy
           WhoBack runs locally, does not ask for your Instagram password, and has no application backend.
