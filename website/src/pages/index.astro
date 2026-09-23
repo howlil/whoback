@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 const releaseUrl = 'https://github.com/howlil/whoback/releases/latest';
+const downloadUrl = 'https://github.com/howlil/whoback/releases/latest/download/whoback-chrome.tar.gz';
 const repoUrl = 'https://github.com/howlil/whoback';
 const avatarImages = {
   alex: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=96&q=82',
@@ -40,7 +41,7 @@ const avatarImages = {
         <a href={repoUrl} target="_blank" rel="noreferrer"><Code2 size={15} strokeWidth={1.8} aria-hidden="true" />GitHub</a>
       </nav>
       <div class="nav-actions">
-        <a class="nav-cta" href={releaseUrl} target="_blank" rel="noreferrer">
+        <a class="nav-cta" href={downloadUrl}>
           Get WhoBack <Download class="nav-cta__icon" size={16} strokeWidth={1.8} aria-hidden="true" />
         </a>
       </div>
@@ -58,7 +59,7 @@ const avatarImages = {
             See who follows you back, who doesn&apos;t, and keep your circle clear — privately in your browser.
           </p>
           <div class="hero-actions">
-            <a class="primary-cta" href={releaseUrl} target="_blank" rel="noreferrer">
+            <a class="primary-cta" href={downloadUrl}>
               Get WhoBack <span class="cta-icon" aria-hidden="true"><ArrowRight size={17} strokeWidth={1.8} /></span>
             </a>
           </div>
@@ -284,10 +285,10 @@ const avatarImages = {
       <section class="footer-cta">
         <div>
           <h2>Check who follows back.<br />Keep your Instagram session in your browser.</h2>
-          <p>Download the release ZIP, extract it, then choose Load unpacked in <code>chrome://extensions</code>.</p>
+          <p>Download the latest release archive, extract it, then choose Load unpacked in <code>chrome://extensions</code>.</p>
         </div>
         <div class="footer-cta__actions">
-          <a class="footer-primary-cta" href={releaseUrl} target="_blank" rel="noreferrer">
+          <a class="footer-primary-cta" href={downloadUrl}>
             Get WhoBack <span aria-hidden="true"><ArrowRight size={16} strokeWidth={1.8} /></span>
           </a>
         </div>
@@ -315,7 +316,7 @@ const avatarImages = {
 
         <div class="footer-install">
           <strong>Install manually</strong>
-          <p>Download the ZIP, extract it, turn on Developer mode, then choose Load unpacked.</p>
+          <p>Download the TAR.GZ, extract it, turn on Developer mode, then choose Load unpacked.</p>
           <code>chrome://extensions</code>
         </div>
       </div>
