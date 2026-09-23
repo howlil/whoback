@@ -82,7 +82,7 @@ jobs:
           3. Open chrome://extensions in Chrome.
           4. Enable Developer mode.
           5. Click Load unpacked.
-          6. Select the extracted folder containing manifest.json.
+          6. Select the extracted whoback folder containing manifest.json.
 
           ### Privacy
           WhoBack runs locally, does not ask for your Instagram password, and has no application backend.
@@ -125,7 +125,7 @@ jobs:
           rm -rf .release/whoback
           mkdir -p .release/whoback
           unzip -q "$ASSET" -d .release/whoback
-          tar -czf whoback-chrome.tar.gz -C .release/whoback .
+          tar -czf whoback-chrome.tar.gz -C .release whoback
 
           sha256sum "whoback-chrome-$TAG.zip" "whoback-chrome.tar.gz" > SHA256SUMS.txt
 
