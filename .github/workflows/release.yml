@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -50,6 +52,13 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Build existing release from its tag
+        if: steps.existing.outputs.exists == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: git checkout --detach "$TAG"
+
       - name: Write release notes
         env:
           TAG: ${{ steps.version.outputs.tag }}
@@ -68,12 +77,12 @@ jobs:
           - Resume interrupted scans without restarting from page 1.
 
           ### Install
-          1. Download whoback-chrome-$TAG.zip from Assets below.
-          2. Extract the ZIP.
-          3. Open chrome://extensions in Chrome.
+          1. Download `whoback-chrome.tar.gz` or `whoback-chrome-$TAG.zip` from Assets below.
+          2. Extract the archive.
+          3. Open `chrome://extensions` in Chrome.
           4. Enable Developer mode.
           5. Click Load unpacked.
-          6. Select the extracted folder containing manifest.json.
+          6. Select the extracted folder containing `manifest.json`.
 
           ### Privacy
           WhoBack runs locally, does not ask for your Instagram password, and has no application backend.
@@ -82,32 +91,19 @@ jobs:
           WhoBack depends on undocumented Instagram Web endpoints. Instagram can change or rate-limit these endpoints at any time.
           EOF
 
-      - name: Update existing release notes
-        if: steps.existing.outputs.exists == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          gh release edit "$TAG"             --title "WhoBack $TAG"             --notes-file release-notes.md
-
       - name: Install dependencies
-        if: steps.existing.outputs.exists != 'true'
         run: pnpm install --no-frozen-lockfile
 
       - name: Typecheck
-        if: steps.existing.outputs.exists != 'true'
         run: pnpm typecheck
 
       - name: Test
-        if: steps.existing.outputs.exists != 'true'
         run: pnpm test
 
       - name: Build
-        if: steps.existing.outputs.exists != 'true'
         run: pnpm build
 
       - name: Package extension
-        if: steps.existing.outputs.exists != 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         shell: bash
@@ -125,7 +121,29 @@ jobs:
           fi
 
           cp "$ASSET" "whoback-chrome-$TAG.zip"
-          sha256sum "whoback-chrome-$TAG.zip" > SHA256SUMS.txt
+
+          rm -rf .release/whoback
+          mkdir -p .release/whoback
+          unzip -q "$ASSET" -d .release/whoback
+          tar -czf whoback-chrome.tar.gz -C .release/whoback .
+
+          sha256sum "whoback-chrome-$TAG.zip" "whoback-chrome.tar.gz" > SHA256SUMS.txt
+
+      - name: Update existing release
+        if: steps.existing.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          gh release edit "$TAG" \
+            --title "WhoBack $TAG" \
+            --notes-file release-notes.md
+
+          gh release upload "$TAG" \
+            "whoback-chrome.tar.gz" \
+            "SHA256SUMS.txt" \
+            --clobber
 
       - name: Publish GitHub Release
         if: steps.existing.outputs.exists != 'true'
@@ -134,4 +152,10 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         shell: bash
         run: |
-          gh release create "$TAG"             "whoback-chrome-$TAG.zip"             "SHA256SUMS.txt"             --target "$GITHUB_SHA"             --title "WhoBack $TAG"             --notes-file release-notes.md
+          gh release create "$TAG" \
+            "whoback-chrome-$TAG.zip" \
+            "whoback-chrome.tar.gz" \
+            "SHA256SUMS.txt" \
+            --target "$GITHUB_SHA" \
+            --title "WhoBack $TAG" \
+            --notes-file release-notes.md
