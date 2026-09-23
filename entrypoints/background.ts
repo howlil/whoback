@@ -1,16 +1,22 @@
 import { browser } from 'wxt/browser';
-import { diffSnapshots } from '../src/domain/relationship';
+import { buildSyncCompletion } from '../src/domain/sync-completion';
 import type {
   ExtensionState,
+  InstagramAccount,
   InstagramUserRef,
+  RelationshipSnapshot,
   ScanCheckpoint,
-  ScanStrategy,
+  ScanTelemetry,
   SyncErrorCode,
 } from '../src/domain/types';
 import { isInstagramUsername } from '../src/instagram/profile-identity';
 import { resolveInstagramViewerId } from '../src/instagram/session-identity';
 import { planRelationshipScan } from '../src/instagram/scan-planner';
 import { planFollowingCountRecovery } from '../src/instagram/scan-recovery';
+import {
+  createScanPacer,
+  type ScanPacer,
+} from '../src/instagram/scan-pacing';
 import {
   runInstagramOperation,
   type InstagramOperation,
@@ -22,6 +28,7 @@ import {
   canAutoSync,
   getState,
   isRateLimitCooldownActive,
+  isSyncBusyPhase,
   patchState,
   setState,
 } from '../src/lib/state';
@@ -30,8 +37,14 @@ const ALARM = 'whoback-auto-sync';
 const INSTAGRAM_URL = 'https://www.instagram.com/';
 const MAX_LIST_PAGES = 10_000;
 const CHECKPOINT_EVERY_REQUESTS = 5;
+const DEFAULT_LIST_PAGE_SIZE = 100;
+const FALLBACK_LIST_PAGE_SIZE = 50;
+const MAX_RELATIONSHIP_CONCURRENCY = 2;
+const PROGRESS_COMMIT_INTERVAL_MS = 1_000;
 
 let activeRunId: string | null = null;
+let lastProgressCommitAt = 0;
+let pendingSyncPatch: Partial<ExtensionState['sync']> | null = null;
 
 export default defineBackground({
   type: 'module',
@@ -83,12 +96,8 @@ async function sanitizePersistedState() {
 
 async function maybeAutoSync() {
   const state = await getState();
-  if (!canAutoSync(state) || isBusy(state) || activeRunId) return;
+  if (!canAutoSync(state) || isSyncBusyPhase(state.sync.phase) || activeRunId) return;
   await startSync(state.account?.username);
-}
-
-function isBusy(state: ExtensionState) {
-  return ['starting', 'planning', 'followers', 'following', 'verifying', 'processing'].includes(state.sync.phase);
 }
 
 async function resolveViewerId(state: ExtensionState): Promise<string | null> {
@@ -126,8 +135,10 @@ function newCheckpoint(
       followingPages: 0,
       followerPages: 0,
       relationshipChecks: 0,
+      requestedPageSize: DEFAULT_LIST_PAGE_SIZE,
     },
     startedAt: now,
+    listPageSize: DEFAULT_LIST_PAGE_SIZE,
     updatedAt: now,
   };
 }
@@ -136,7 +147,7 @@ async function startSync(username?: string) {
   let state = await getState();
   const expectedUsername = username ?? state.account?.username;
 
-  if (isBusy(state) || activeRunId) return;
+  if (isSyncBusyPhase(state.sync.phase) || activeRunId) return;
 
   if (isRateLimitCooldownActive(state)) {
     const remainingMs = Math.max(0, (state.sync.cooldownUntil ?? 0) - Date.now());
@@ -185,6 +196,8 @@ async function startSync(username?: string) {
 
   const runId = crypto.randomUUID();
   activeRunId = runId;
+  lastProgressCommitAt = 0;
+  pendingSyncPatch = null;
 
   await patchState({
     scanCheckpoint: checkpoint,
@@ -217,6 +230,7 @@ async function runAdaptiveSync(
   checkpoint: ScanCheckpoint,
 ) {
   try {
+    const pacer = createScanPacer(checkpoint.requestCount);
     const following = new Map(
       checkpoint.following.users.map((user) => [user.id, user] as const),
     );
@@ -226,12 +240,10 @@ async function runAdaptiveSync(
 
     if (checkpoint.followingTotal == null || checkpoint.followersTotal == null) {
       await patchSync('planning', 6, 'Planning the lowest-request scan…');
-      const counts = await executeOperation(tabId, {
+      const counts = await executePacedOperation(pacer, checkpoint, tabId, {
         kind: 'counts',
         viewerId,
       });
-
-      recordOperation(checkpoint, counts);
 
       if (!counts.ok) {
         if (isHardStop(counts) || isRecoverablePause(counts)) {
@@ -242,7 +254,6 @@ async function runAdaptiveSync(
         checkpoint.followingTotal = counts.followingTotal;
         checkpoint.followersTotal = counts.followersTotal;
         await persistCheckpoint(checkpoint);
-        await pace(checkpoint);
       }
     }
 
@@ -251,13 +262,14 @@ async function runAdaptiveSync(
       for (let page = checkpoint.following.pages + 1; page <= MAX_LIST_PAGES; page += 1) {
         if (!isCurrentRun(runId)) return;
 
-        const result = await executeOperation(tabId, {
-          kind: 'list-page',
+        const result = await fetchListPage(
+          pacer,
+          checkpoint,
+          tabId,
           viewerId,
-          list: 'following',
-          cursor: checkpoint.following.cursor,
-        });
-        recordOperation(checkpoint, result);
+          'following',
+          checkpoint.following.cursor,
+        );
 
         if (!result.ok) {
           await finishFailure(result, checkpoint);
@@ -296,7 +308,6 @@ async function runAdaptiveSync(
         }
 
         if (result.done) break;
-        await pace(checkpoint);
       }
     }
 
@@ -345,6 +356,7 @@ async function runAdaptiveSync(
       followersTotal: checkpoint.followersTotal,
       loadedFollowers: followers.size,
       unresolvedFollowing,
+      observedFollowerPageSize: checkpoint.observedFollowerPageSize,
     });
     checkpoint.strategy = checkpoint.strategy ?? plan.strategy;
     checkpoint.telemetry.strategy = checkpoint.strategy;
@@ -353,6 +365,7 @@ async function runAdaptiveSync(
     if (checkpoint.strategy === 'verify-following') {
       const ok = await verifyFollowing(
         runId,
+        pacer,
         tabId,
         viewerId,
         checkpoint,
@@ -363,6 +376,7 @@ async function runAdaptiveSync(
     } else {
       const ok = await fetchFollowers(
         runId,
+        pacer,
         tabId,
         viewerId,
         checkpoint,
@@ -380,6 +394,7 @@ async function runAdaptiveSync(
         checkpoint.telemetry.strategy = 'verify-following';
         const verified = await verifyFollowing(
           runId,
+          pacer,
           tabId,
           viewerId,
           checkpoint,
@@ -425,35 +440,18 @@ async function runAdaptiveSync(
     checkpoint.telemetry.totalMs = Date.now() - checkpoint.startedAt;
 
     const state = await getState();
-    const snapshots = [...state.snapshots, snapshot].slice(-30);
-    const previous = snapshots.at(-2);
-    const changes = diffSnapshots(previous, snapshot);
-    const badgeCount = changes.followersComplete
-      ? changes.newFollowers.length + changes.unfollowers.length
-      : 0;
-
-    await setState({
-      ...state,
+    await completeSync(snapshot, {
       account: {
         ...(state.account ?? { username: expectedUsername ?? checkpoint.username ?? 'instagram-user' }),
         username: expectedUsername ?? checkpoint.username ?? state.account?.username ?? 'instagram-user',
         platformUserId: viewerId,
         detectedAt: Date.now(),
       },
-      scanCheckpoint: undefined,
-      lastScanTelemetry: checkpoint.telemetry,
-      snapshots,
-      sync: {
-        phase: 'complete',
-        progress: 100,
-        message: coverage === 'following-only'
-          ? 'Fast scan complete'
-          : 'Full scan complete',
-        finishedAt: Date.now(),
-      },
+      telemetry: checkpoint.telemetry,
+      message: coverage === 'following-only'
+        ? 'Fast scan complete'
+        : 'Full scan complete',
     });
-
-    await updateBadge(badgeCount, state.settings.showBadge);
   } catch {
     const latest = await getState();
     if (latest.scanCheckpoint) {
@@ -467,8 +465,26 @@ async function runAdaptiveSync(
   }
 }
 
+async function completeSync(
+  snapshot: RelationshipSnapshot,
+  options: {
+    account?: InstagramAccount;
+    telemetry?: ScanTelemetry;
+    message: string;
+  },
+): Promise<void> {
+  const current = await getState();
+  const completion = buildSyncCompletion(current, snapshot, options);
+
+  await setState(completion.state);
+  pendingSyncPatch = null;
+  lastProgressCommitAt = Date.now();
+  await updateBadge(completion.badgeCount, current.settings.showBadge);
+}
+
 async function fetchFollowers(
   runId: string,
+  pacer: ScanPacer,
   tabId: number,
   viewerId: string,
   checkpoint: ScanCheckpoint,
@@ -481,13 +497,14 @@ async function fetchFollowers(
   for (let page = checkpoint.followers.pages + 1; page <= MAX_LIST_PAGES; page += 1) {
     if (!isCurrentRun(runId)) return false;
 
-    const result = await executeOperation(tabId, {
-      kind: 'list-page',
+    const result = await fetchListPage(
+      pacer,
+      checkpoint,
+      tabId,
       viewerId,
-      list: 'followers',
-      cursor: checkpoint.followers.cursor,
-    });
-    recordOperation(checkpoint, result);
+      'followers',
+      checkpoint.followers.cursor,
+    );
 
     if (!result.ok) {
       await finishFailure(result, checkpoint);
@@ -526,7 +543,6 @@ async function fetchFollowers(
     }
 
     if (result.done) return true;
-    await pace(checkpoint);
   }
 
   await persistMaps(checkpoint, following, followers);
@@ -539,6 +555,7 @@ async function fetchFollowers(
 
 async function verifyFollowing(
   runId: string,
+  pacer: ScanPacer,
   tabId: number,
   viewerId: string,
   checkpoint: ScanCheckpoint,
@@ -555,55 +572,91 @@ async function verifyFollowing(
     (user) => typeof checkpoint.verified[user.id] !== 'boolean',
   );
 
-  for (let index = 0; index < pending.length; index += 1) {
-    if (!isCurrentRun(runId)) return false;
+  let nextIndex = 0;
+  let processed = 0;
+  let completed = Object.keys(checkpoint.verified).length;
+  let stopError: InstagramOperationFailure | null = null;
+  let resultQueue = Promise.resolve();
 
-    const user = pending[index];
-    if (!user) continue;
+  const applyResult = (user: InstagramUserRef, result: Extract<InstagramOperationResult, { ok: true }>) => {
+    const previous = resultQueue;
+    resultQueue = previous.then(async () => {
+      if (result.kind !== 'relationship') {
+        stopError ??= {
+          ok: false,
+          durationMs: 0,
+          error: {
+            code: 'INVALID_RESPONSE',
+            message: 'Instagram returned an unexpected relationship response.',
+          },
+        };
+        return;
+      }
 
-    const result = await executeOperation(tabId, {
-      kind: 'relationship',
-      viewerId,
-      targetUserId: user.id,
+      checkpoint.telemetry.relationshipChecks += 1;
+
+      if (!result.following) {
+        following.delete(user.id);
+        checkpoint.verified[user.id] = true;
+      } else {
+        checkpoint.verified[user.id] = result.followedBy;
+      }
+
+      processed += 1;
+      completed = Object.keys(checkpoint.verified).length;
+      const total = Math.max(1, following.size);
+
+      await patchSync(
+        'verifying',
+        Math.min(95, 50 + Math.round((completed / total) * 45)),
+        `Checking follow-back: ${Math.min(completed, total).toLocaleString()} / ${total.toLocaleString()}`,
+      );
+
+      if (shouldPersist(checkpoint) || processed === pending.length) {
+        checkpoint.following.users = [...following.values()];
+        await persistCheckpoint(checkpoint);
+      }
     });
-    recordOperation(checkpoint, result);
 
-    if (!result.ok) {
-      await persistMaps(checkpoint, following, followers);
-      await finishFailure(result, checkpoint);
-      return false;
+    return resultQueue;
+  };
+
+  const worker = async () => {
+    while (isCurrentRun(runId) && !stopError) {
+      const user = pending[nextIndex];
+      nextIndex += 1;
+      if (!user) return;
+
+      const result = await executePacedOperationIfActive(
+        pacer,
+        checkpoint,
+        tabId,
+        {
+          kind: 'relationship',
+          viewerId,
+          targetUserId: user.id,
+        },
+        () => !stopError && isCurrentRun(runId),
+      );
+
+      if (!result) return;
+      if (!result.ok) {
+        stopError ??= result;
+        return;
+      }
+
+      await applyResult(user, result);
     }
-    if (result.kind !== 'relationship') {
-      await setSyncError('INVALID_RESPONSE', 'Instagram returned an unexpected relationship response.');
-      return false;
-    }
+  };
 
-    checkpoint.telemetry.relationshipChecks += 1;
+  const workerCount = Math.min(MAX_RELATIONSHIP_CONCURRENCY, pending.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  await resultQueue;
 
-    if (!result.following) {
-      following.delete(user.id);
-      checkpoint.verified[user.id] = true;
-    } else {
-      checkpoint.verified[user.id] = result.followedBy;
-    }
-
-    const completed = Object.keys(checkpoint.verified).length;
-    const total = Math.max(1, following.size);
-
-    await patchSync(
-      'verifying',
-      Math.min(95, 50 + Math.round((completed / total) * 45)),
-      `Checking follow-back: ${Math.min(completed, total).toLocaleString()} / ${total.toLocaleString()}`,
-    );
-
-    if (shouldPersist(checkpoint) || index === pending.length - 1) {
-      checkpoint.following.users = [...following.values()];
-      await persistCheckpoint(checkpoint);
-    }
-
-    if (index < pending.length - 1) {
-      await pace(checkpoint);
-    }
+  if (stopError) {
+    await persistMaps(checkpoint, following, followers);
+    await finishFailure(stopError, checkpoint);
+    return false;
   }
 
   checkpoint.following.users = [...following.values()];
@@ -621,17 +674,90 @@ function recordOperation(
   checkpoint.updatedAt = Date.now();
 }
 
-async function pace(checkpoint: ScanCheckpoint) {
-  const longPause = checkpoint.requestCount > 0
-    && checkpoint.requestCount % 5 === 0;
-  const plannedMs = longPause
-    ? 20_000 + Math.floor(Math.random() * 3_000)
-    : 1_500 + Math.floor(Math.random() * 1_500);
+async function executePacedOperation(
+  pacer: ScanPacer,
+  checkpoint: ScanCheckpoint,
+  tabId: number,
+  operation: InstagramOperation,
+): Promise<InstagramOperationResult> {
+  const result = await executePacedOperationIfActive(
+    pacer,
+    checkpoint,
+    tabId,
+    operation,
+    () => true,
+  );
 
-  checkpoint.telemetry.plannedWaitMs += plannedMs;
-  const startedAt = Date.now();
-  await new Promise((resolve) => setTimeout(resolve, plannedMs));
-  checkpoint.telemetry.actualWaitMs += Date.now() - startedAt;
+  if (!result) throw new Error('Paced operation was unexpectedly cancelled.');
+  return result;
+}
+
+async function executePacedOperationIfActive(
+  pacer: ScanPacer,
+  checkpoint: ScanCheckpoint,
+  tabId: number,
+  operation: InstagramOperation,
+  canExecute: () => boolean,
+): Promise<InstagramOperationResult | undefined> {
+  const wait = await pacer.waitForRequest();
+  if (!canExecute()) return undefined;
+
+  checkpoint.telemetry.plannedWaitMs += wait.plannedMs;
+  checkpoint.telemetry.actualWaitMs += wait.actualMs;
+
+  const result = await executeOperation(tabId, operation);
+  recordOperation(checkpoint, result);
+  return result;
+}
+
+function shouldFallbackListPageSize(result: InstagramOperationResult): boolean {
+  return !result.ok
+    && result.error.code === 'RELATIONSHIP_REQUEST_FAILED'
+    && (result.error.status === 400 || result.error.status === 422);
+}
+
+async function fetchListPage(
+  pacer: ScanPacer,
+  checkpoint: ScanCheckpoint,
+  tabId: number,
+  viewerId: string,
+  list: 'followers' | 'following',
+  cursor?: string,
+): Promise<InstagramOperationResult> {
+  const requestedPageSize = checkpoint.listPageSize ?? DEFAULT_LIST_PAGE_SIZE;
+  checkpoint.telemetry.requestedPageSize = requestedPageSize;
+
+  let result = await executePacedOperation(pacer, checkpoint, tabId, {
+    kind: 'list-page',
+    viewerId,
+    list,
+    cursor,
+    pageSize: requestedPageSize,
+  });
+
+  if (shouldFallbackListPageSize(result) && requestedPageSize > FALLBACK_LIST_PAGE_SIZE) {
+    checkpoint.listPageSize = FALLBACK_LIST_PAGE_SIZE;
+    checkpoint.telemetry.requestedPageSize = FALLBACK_LIST_PAGE_SIZE;
+    await persistCheckpoint(checkpoint);
+
+    result = await executePacedOperation(pacer, checkpoint, tabId, {
+      kind: 'list-page',
+      viewerId,
+      list,
+      cursor,
+      pageSize: FALLBACK_LIST_PAGE_SIZE,
+    });
+  }
+
+  if (result.ok && result.kind === 'list-page' && list === 'followers' && result.rawCount > 0) {
+    checkpoint.observedFollowerPageSize = Math.max(
+      checkpoint.observedFollowerPageSize ?? 0,
+      result.rawCount,
+    );
+    checkpoint.telemetry.observedFollowerPageSize = checkpoint.observedFollowerPageSize;
+  }
+
+  return result;
 }
 
 function mergeInto(
@@ -664,7 +790,7 @@ async function persistMaps(
 async function persistCheckpoint(checkpoint: ScanCheckpoint) {
   checkpoint.updatedAt = Date.now();
   const startedAt = performance.now();
-  await patchState({ scanCheckpoint: checkpoint });
+  await commitScanState({ checkpoint, force: true });
   checkpoint.telemetry.storageWriteMs += Math.max(
     0,
     Math.round(performance.now() - startedAt),
@@ -737,15 +863,46 @@ function checkpointProgress(checkpoint: ScanCheckpoint): number {
   return Math.min(45, 10 + checkpoint.following.pages);
 }
 
+async function commitScanState({
+  checkpoint,
+  sync,
+  force = false,
+}: {
+  checkpoint?: ScanCheckpoint;
+  sync?: Partial<ExtensionState['sync']>;
+  force?: boolean;
+}): Promise<void> {
+  if (sync) {
+    pendingSyncPatch = {
+      ...pendingSyncPatch,
+      ...sync,
+    };
+  }
+
+  const now = Date.now();
+  if (!force && now - lastProgressCommitAt < PROGRESS_COMMIT_INTERVAL_MS) return;
+
+  const current = await getState();
+  await setState({
+    ...current,
+    ...(checkpoint ? { scanCheckpoint: checkpoint } : {}),
+    sync: {
+      ...current.sync,
+      ...(pendingSyncPatch ?? {}),
+    },
+  });
+
+  pendingSyncPatch = null;
+  lastProgressCommitAt = Date.now();
+}
+
 async function patchSync(
   phase: ExtensionState['sync']['phase'],
   progress: number,
   message: string,
 ) {
-  const state = await getState();
-  await patchState({
+  await commitScanState({
     sync: {
-      ...state.sync,
       phase,
       progress,
       message,
@@ -862,7 +1019,7 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
         },
       });
 
-      if (canAutoSync(state) && !isBusy(state) && !activeRunId) {
+      if (canAutoSync(state) && !isSyncBusyPhase(state.sync.phase) && !activeRunId) {
         void startSync(message.account.username);
       }
       return { ok: true };
@@ -912,28 +1069,10 @@ async function handleMessage(message: WhoBackMessage, senderTabId?: number) {
     }
 
     case 'SYNC_COMPLETE': {
-      const state = await getState();
-      const snapshots = [...state.snapshots, message.snapshot].slice(-30);
-      const previous = snapshots.at(-2);
-      const changes = diffSnapshots(previous, message.snapshot);
-      const badgeCount = changes.followersComplete
-        ? changes.newFollowers.length + changes.unfollowers.length
-        : 0;
-
-      await setState({
-        ...state,
-        account: message.account ?? state.account,
-        scanCheckpoint: undefined,
-        snapshots,
-        sync: {
-          phase: 'complete',
-          progress: 100,
-          message: 'Up to date',
-          finishedAt: Date.now(),
-        },
+      await completeSync(message.snapshot, {
+        account: message.account,
+        message: 'Up to date',
       });
-
-      await updateBadge(badgeCount, state.settings.showBadge);
       return { ok: true };
     }
 

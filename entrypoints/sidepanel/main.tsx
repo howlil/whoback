@@ -8,6 +8,7 @@ import { Avatar } from '../../src/ui/Avatar';
 import { Logo } from '../../src/ui/Logo';
 import { ExternalIcon, RefreshIcon, SearchIcon, SettingsIcon } from '../../src/ui/icons';
 import { useExtensionState } from '../../src/ui/use-state';
+import { isSyncBusyPhase } from '../../src/lib/state';
 
 const views: { id: RelationshipView; label: string }[] = [
   { id: 'not-back', label: "Don't follow back" },
@@ -23,7 +24,7 @@ function SidePanel() {
   const previous = state.snapshots.at(-2);
   const analysis = latest ? analyzeSnapshot(latest) : null;
   const changes = latest ? diffSnapshots(previous, latest) : null;
-  const busy = ['starting', 'planning', 'followers', 'following', 'verifying', 'processing'].includes(state.sync.phase);
+  const busy = isSyncBusyPhase(state.sync.phase);
 
   const rows = useMemo(() => {
     if (!analysis) return [];

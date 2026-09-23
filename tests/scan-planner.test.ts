@@ -25,6 +25,18 @@ describe('scan planner', () => {
     expect(plan.estimatedFollowerPageRequests).toBe(21);
   });
 
+  it('uses the observed follower page size after the first page', () => {
+    const plan = planRelationshipScan({
+      followersTotal: 500,
+      loadedFollowers: 0,
+      unresolvedFollowing: 10,
+      observedFollowerPageSize: 100,
+    });
+
+    expect(plan.strategy).toBe('full-lists');
+    expect(plan.estimatedFollowerPageRequests).toBe(5);
+  });
+
   it('preserves full-list behavior when follower count is unknown', () => {
     const plan = planRelationshipScan({
       followersTotal: null,

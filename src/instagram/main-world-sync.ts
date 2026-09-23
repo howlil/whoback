@@ -10,6 +10,7 @@ export type InstagramOperation =
       viewerId: string;
       list: 'followers' | 'following';
       cursor?: string;
+      pageSize?: number;
     }
   | {
       kind: 'relationship';
@@ -223,7 +224,8 @@ export async function runInstagramOperation(
   }
 
   if (operation.kind === 'list-page') {
-    const params = new URLSearchParams({ count: '50' });
+    const pageSize = Math.min(100, Math.max(1, Math.floor(operation.pageSize ?? 50)));
+    const params = new URLSearchParams({ count: String(pageSize) });
     if (operation.cursor) params.set('max_id', operation.cursor);
 
     const response = await request(

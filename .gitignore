@@ -7,3 +7,5 @@ node_modules
 .astro/
 dist/
 website/website/
+playwright-report/
+test-results/

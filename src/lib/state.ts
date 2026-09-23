@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import type { ExtensionState, Settings } from '../domain/types';
+import type { ExtensionState, Settings, SyncPhase } from '../domain/types';
 
 export const STATE_KEY = 'whoback-state';
 
@@ -15,6 +15,19 @@ export const DEFAULT_STATE: ExtensionState = {
   sync: { phase: 'idle', progress: 0 },
   settings: DEFAULT_SETTINGS,
 };
+
+const BUSY_PHASES: ReadonlySet<SyncPhase> = new Set([
+  'starting',
+  'planning',
+  'followers',
+  'following',
+  'verifying',
+  'processing',
+]);
+
+export function isSyncBusyPhase(phase: SyncPhase): boolean {
+  return BUSY_PHASES.has(phase);
+}
 
 export async function getState(): Promise<ExtensionState> {
   const stored = await browser.storage.local.get(STATE_KEY);

@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import { detectCurrentAccount } from '../src/instagram/detect-account';
 import type { InstagramAccount, ScanCheckpoint, SyncPhase } from '../src/domain/types';
-import type { WhoBackMessage } from '../src/lib/messages';
+import type { AccountProbeMessage, WhoBackMessage } from '../src/lib/messages';
 
 type MainWorldBridgeMessage =
   | {
@@ -22,6 +22,16 @@ export default defineContentScript({
   runAt: 'document_start',
   async main() {
     let lastUsername = '';
+
+    browser.runtime.onMessage.addListener((
+      message: AccountProbeMessage,
+      _sender,
+      sendResponse,
+    ) => {
+      if (message.type !== 'REQUEST_ACCOUNT') return undefined;
+      sendResponse(detectCurrentAccount());
+      return true;
+    });
 
     const sendDetectedAccount = async (account: InstagramAccount | null) => {
       if (!account || account.username === lastUsername) return account;

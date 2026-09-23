@@ -81,6 +81,25 @@ describe('runInstagramOperation', () => {
     ]);
   });
 
+  it('uses the requested larger page size when the endpoint accepts it', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return jsonResponse({ status: 'ok', users: [], has_more: false });
+    }) as typeof fetch;
+
+    await runInstagramOperation({
+      kind: 'list-page',
+      viewerId: '42',
+      list: 'followers',
+      pageSize: 100,
+    });
+
+    expect(calls).toEqual([
+      '/api/v1/friendships/42/followers/?count=100',
+    ]);
+  });
+
   it('checks one follow-back relationship', async () => {
     globalThis.fetch = vi.fn(async () => jsonResponse({
       status: 'ok',

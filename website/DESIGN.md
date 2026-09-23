@@ -10,8 +10,8 @@ to a WhoBack backend?
 
 ```text
 Arrive
-  -> see a WhoBack popup docked to a browser session
-  -> read the relationship snapshot
+  -> understand the relationship question and primary CTA
+  -> read the relationship snapshot preview
   -> follow the scan execution path
   -> inspect the privacy ledger
   -> download and manually install the release
@@ -20,20 +20,17 @@ Arrive
 ## Surface graph
 
 ```text
-Hero<C: promise + before/after proof + CTA>
-  -> ProofRail<C: session, answer, local result>
-  -> MetricSnapshot<C: followers, following, relationship states>
+Hero<C: promise + CTA>
+  -> FeatureShowcase<C: relationship states + scan changes>
   -> ScanTimeline<C: ready, sync, done>
-  -> RecoveryState<C: paused checkpoint>
   -> PrivacyLedger<C: explicit data contract>
   -> InstallDock<C: download, extract, load unpacked>
 ```
 
 The memorable surface is the Hero: a floating navigation pill, one centered
-promise, and a before/after proof pair. The browser-session card explains the
-starting context; the WhoBack popup card shows the useful result. This borrows
-the reference composition without turning the landing page into a generic SaaS
-dashboard or inventing a live Instagram connection.
+promise, and a direct download CTA. The feature board provides the product
+proof below it without inventing a live Instagram connection or requiring a
+generic SaaS dashboard.
 
 ## Visual system
 
@@ -57,18 +54,10 @@ recognize the product before installing it:
 
 - The page is static and does not require account data, a backend, or an auth
   state before it can render.
-- The product preview is an illustrative extension snapshot, clearly marked as
-  a sample; it does not pretend to be a live Instagram connection.
-- The scan timeline and recovery panel are explanatory state surfaces. They do
-  not run a scan and do not claim live progress.
-- The popup preview has four interactive sample views: Overview, Don't follow
-  back, Mutual, and You follow. Switching a view updates the headline, metric
-  cards, and sample rows in the same surface.
-- Motion is limited to the popup's first entrance, tab-panel continuity, and
-  press/focus feedback. Reduced motion removes spatial and blur movement while
-  keeping the selected state and content change visible.
-- The only automatic motion is a short hero scan reveal. Reduced motion removes
-  it without changing the content flow.
+- The feature board, workflow cards, and scan summary are illustrative static
+  surfaces; they do not pretend to be a live Instagram connection.
+- Motion is limited to section reveals, illustrative counters, and pointer
+  feedback. Reduced motion removes movement while keeping the content visible.
 - Keyboard focus uses a visible signal-red outline. The page reflows the
   two-column surfaces into a single reading column below the tablet breakpoint.
 

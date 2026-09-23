@@ -63,6 +63,8 @@ export interface ScanTelemetry {
   followersCountGap?: number;
   totalMs?: number;
   strategy?: ScanStrategy;
+  requestedPageSize?: number;
+  observedFollowerPageSize?: number;
 }
 
 export interface ScanCheckpoint {
@@ -80,6 +82,8 @@ export interface ScanCheckpoint {
   telemetry: ScanTelemetry;
   startedAt: number;
   followingRetryCount?: number;
+  listPageSize?: number;
+  observedFollowerPageSize?: number;
   updatedAt: number;
 }
 

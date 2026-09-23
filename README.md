@@ -82,7 +82,8 @@ Klik **View details** untuk melihat daftar akun.
 
 ## Kalau scan berhenti?
 
-WhoBack menyimpan progress setelah setiap halaman data selesai dibaca.
+WhoBack menyimpan checkpoint progress secara berkala selama scan, lalu selalu
+memaksa penyimpanan saat scan pause, error, atau selesai.
 
 Jadi kalau scan berhenti di tengah jalan, progress **tidak langsung hilang**.
 
@@ -215,6 +216,7 @@ Konsekuensinya:
 - Tailwind CSS
 - Chrome Storage, Cookies, Scripting, Alarms, dan Side Panel APIs
 - Vitest
+- Playwright untuk smoke test extension di Chromium
 
 ### Run locally
 
@@ -230,6 +232,24 @@ pnpm dev
 pnpm check
 pnpm zip
 ```
+
+### Tests
+
+Unit test:
+
+```bash
+pnpm test
+```
+
+Extension E2E smoke test:
+
+```bash
+pnpm test:e2e
+```
+
+E2E memuat hasil build sebagai extension MV3 di Chromium headed, memakai fixture
+Instagram dan respons API deterministik. Test ini memverifikasi deteksi akun dari
+popup, scan, snapshot tersimpan, dan hasil di sidepanel tanpa memakai akun nyata.
 
 Load folder berikut sebagai unpacked extension:
 

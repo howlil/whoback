@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { ExtensionState, ScanCheckpoint } from '../src/domain/types';
-import { canAutoSync, isRateLimitCooldownActive } from '../src/lib/state';
+import {
+  canAutoSync,
+  isRateLimitCooldownActive,
+  isSyncBusyPhase,
+} from '../src/lib/state';
 
 function makeState(overrides: Partial<ExtensionState> = {}): ExtensionState {
   return {
@@ -53,6 +57,26 @@ function checkpoint(): ScanCheckpoint {
 }
 
 describe('sync guards', () => {
+  it('recognizes every active sync phase as busy', () => {
+    for (const phase of [
+      'starting',
+      'planning',
+      'followers',
+      'following',
+      'verifying',
+      'processing',
+    ] as const) {
+      expect(isSyncBusyPhase(phase)).toBe(true);
+    }
+  });
+
+  it('does not mark terminal phases as busy', () => {
+    expect(isSyncBusyPhase('idle')).toBe(false);
+    expect(isSyncBusyPhase('paused')).toBe(false);
+    expect(isSyncBusyPhase('error')).toBe(false);
+    expect(isSyncBusyPhase('complete')).toBe(false);
+  });
+
   it('never auto-syncs before the first successful manual snapshot', () => {
     expect(canAutoSync(makeState(), 10_000)).toBe(false);
   });

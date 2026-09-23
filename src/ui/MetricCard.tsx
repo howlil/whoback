@@ -1,6 +1,6 @@
 export function MetricCard({ value, label, tone = 'neutral' }: { value: number | string; label: string; tone?: 'neutral' | 'positive' | 'danger' | 'warn' }) {
   const toneClass = {
-    neutral: 'bg-[#f7f7fa] text-ink',
+    neutral: 'bg-surface-muted text-ink',
     positive: 'bg-positive-soft text-positive',
     danger: 'bg-danger-soft text-danger',
     warn: 'bg-warn-soft text-warn',

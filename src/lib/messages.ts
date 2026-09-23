@@ -6,6 +6,10 @@ import type {
   SyncPhase,
 } from '../domain/types';
 
+export type AccountProbeMessage = {
+  type: 'REQUEST_ACCOUNT';
+};
+
 export type WhoBackMessage =
   | { type: 'ACCOUNT_DETECTED'; account: InstagramAccount }
   | { type: 'START_SYNC' }
