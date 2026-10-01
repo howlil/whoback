@@ -196,6 +196,7 @@ describe('runInstagramOperation', () => {
       message: 'Instagram rate-limited the scan. Progress was saved and WhoBack stopped immediately.',
       status: 429,
       retryAfterMs: 120_000,
+      transport: 'rest',
     });
   });
 
