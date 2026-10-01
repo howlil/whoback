@@ -20,6 +20,5 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: pnpm zip
-      - run: pnpm site:build
       - run: pnpm --dir website install --frozen-lockfile
       - run: pnpm --dir website build
