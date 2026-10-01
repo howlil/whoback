@@ -1,5 +1,7 @@
 import type { InstagramUserRef, SyncErrorCode } from '../domain/types';
 
+export type InstagramListTransport = 'graphql' | 'rest';
+
 export type InstagramOperation =
   | {
       kind: 'counts';
@@ -11,6 +13,7 @@ export type InstagramOperation =
       list: 'followers' | 'following';
       cursor?: string;
       pageSize?: number;
+      transport?: InstagramListTransport;
     }
   | {
       kind: 'relationship';
@@ -34,6 +37,8 @@ export type InstagramOperationSuccess =
       nextCursor?: string;
       done: boolean;
       rawCount: number;
+      reportedTotal?: number | null;
+      transport: InstagramListTransport;
     }
   | {
       ok: true;
@@ -52,6 +57,8 @@ export type InstagramOperationFailure = {
     message: string;
     status?: number;
     retryAfterMs?: number;
+    signal?: string;
+    transport?: InstagramListTransport;
   };
 };
 
@@ -67,6 +74,9 @@ export async function runInstagramOperation(
   operation: InstagramOperation,
 ): Promise<InstagramOperationResult> {
   const API_BASE = '/api/v1';
+  const GRAPHQL_BASE = '/graphql/query/';
+  const FOLLOWING_QUERY_HASH = '58712303d941c6855d4e888c5f0cd22f';
+  const FOLLOWERS_QUERY_HASH = '37479f2b8209594dde7facb0d904896a';
   const IG_APP_ID = '936619743392459';
   const startedAt = performance.now();
 
@@ -77,6 +87,8 @@ export async function runInstagramOperation(
     message: string,
     status?: number,
     retryAfterMs?: number,
+    signal?: string,
+    transport?: InstagramListTransport,
   ): InstagramOperationFailure => ({
     ok: false,
     durationMs: duration(),
@@ -85,18 +97,43 @@ export async function runInstagramOperation(
       message,
       ...(status ? { status } : {}),
       ...(retryAfterMs ? { retryAfterMs } : {}),
+      ...(signal ? { signal } : {}),
+      ...(transport ? { transport } : {}),
     },
   });
 
+  const retryAfterMs = (value: string | null): number | undefined => {
+    if (!value) return undefined;
+
+    const numericSeconds = Number(value);
+    if (Number.isFinite(numericSeconds) && numericSeconds > 0) {
+      return numericSeconds * 1000;
+    }
+
+    const retryDate = Date.parse(value);
+    if (!Number.isFinite(retryDate)) return undefined;
+    return Math.max(1_000, retryDate - Date.now());
+  };
+
+  const classifySignal = (data: Record<string, unknown>): string | undefined => {
+    const message = String(data.message ?? '').toLowerCase();
+    if (data.require_login === true || message.includes('login_required')) return 'login_required';
+    if (data.checkpoint_url || message.includes('checkpoint')) return 'checkpoint';
+    if (data.spam === true || message.includes('feedback_required')) return 'feedback_required';
+    if (message.includes('please wait')) return 'please_wait';
+    return undefined;
+  };
+
   const request = async (
-    path: string,
+    url: string,
+    transport?: InstagramListTransport,
   ): Promise<
     | { ok: true; data: Record<string, unknown> }
     | InstagramOperationFailure
   > => {
     let response: Response;
     try {
-      response = await fetch(`${API_BASE}${path}`, {
+      response = await fetch(url, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -110,45 +147,68 @@ export async function runInstagramOperation(
       return fail(
         'NETWORK_ERROR',
         'Instagram request failed inside the signed-in page. Reload Instagram and try again.',
+        undefined,
+        undefined,
+        undefined,
+        transport,
       );
     }
 
+    const body = await response.text();
+    let data: Record<string, unknown> = {};
+    if (body.trim()) {
+      try {
+        data = JSON.parse(body) as Record<string, unknown>;
+      } catch {
+        if (response.ok) {
+          return fail(
+            'INVALID_RESPONSE',
+            'Instagram returned an unexpected response.',
+            response.status,
+            undefined,
+            undefined,
+            transport,
+          );
+        }
+      }
+    }
+
+    const signal = classifySignal(data);
+
     if (!response.ok) {
-      if (response.status === 401) {
+      if (response.status === 401 || signal === 'login_required') {
         return fail(
           'SESSION_EXPIRED',
           'Your Instagram session expired. Refresh Instagram and sign in again.',
-          401,
+          response.status,
+          undefined,
+          signal,
+          transport,
         );
       }
 
       if (response.status === 403) {
         return fail(
           'REQUEST_BLOCKED',
-          'Instagram temporarily blocked this scan. Progress was saved; wait before resuming.',
+          'Instagram blocked this scan request. Progress was saved; wait before trying again.',
           403,
+          retryAfterMs(response.headers.get('retry-after')),
+          signal,
+          transport,
         );
       }
 
       if (response.status === 429) {
-        const retryAfterHeader = response.headers.get('retry-after');
-        const numericSeconds = Number(retryAfterHeader ?? 0);
-        let retryAfterMs = Number.isFinite(numericSeconds) && numericSeconds > 0
-          ? numericSeconds * 1000
-          : 15 * 60 * 1000;
-
-        if (retryAfterHeader && !Number.isFinite(numericSeconds)) {
-          const retryDate = Date.parse(retryAfterHeader);
-          if (Number.isFinite(retryDate)) {
-            retryAfterMs = Math.max(1_000, retryDate - Date.now());
-          }
-        }
-
+        const retryMs = retryAfterMs(response.headers.get('retry-after'));
         return fail(
           'RATE_LIMITED',
-          'Instagram rate-limited the scan. Progress was saved and WhoBack stopped immediately.',
+          retryMs
+            ? 'Instagram rate-limited the scan. Progress was saved and WhoBack stopped immediately.'
+            : 'Instagram returned HTTP 429 without a retry time. Progress was saved; wait before trying again.',
           429,
-          retryAfterMs,
+          retryMs,
+          signal,
+          transport,
         );
       }
 
@@ -157,6 +217,9 @@ export async function runInstagramOperation(
           'INSTAGRAM_UNAVAILABLE',
           `Instagram is temporarily unavailable (HTTP ${response.status}). Progress was saved.`,
           response.status,
+          undefined,
+          signal,
+          transport,
         );
       }
 
@@ -164,34 +227,49 @@ export async function runInstagramOperation(
         'RELATIONSHIP_REQUEST_FAILED',
         `Instagram rejected the request (HTTP ${response.status}). Progress was saved.`,
         response.status,
+        undefined,
+        signal,
+        transport,
       );
     }
 
-    const body = await response.text();
     if (!body.trim()) {
-      return fail('INVALID_RESPONSE', 'Instagram returned an empty response.');
-    }
-
-    let data: Record<string, unknown>;
-    try {
-      data = JSON.parse(body) as Record<string, unknown>;
-    } catch {
-      return fail('INVALID_RESPONSE', 'Instagram returned an unexpected response.');
+      return fail(
+        'INVALID_RESPONSE',
+        'Instagram returned an empty response.',
+        response.status,
+        undefined,
+        signal,
+        transport,
+      );
     }
 
     const status = data.status;
-    const message = String(data.message ?? '').toLowerCase();
     if (
       status === 'fail'
-      || data.spam === true
-      || data.checkpoint_url
-      || message.includes('please wait')
-      || message.includes('feedback_required')
-      || message.includes('checkpoint')
+      || signal === 'checkpoint'
+      || signal === 'feedback_required'
+      || signal === 'please_wait'
+      || signal === 'login_required'
     ) {
+      if (signal === 'login_required') {
+        return fail(
+          'SESSION_EXPIRED',
+          'Instagram requires a fresh signed-in session. Refresh Instagram and sign in again.',
+          response.status,
+          undefined,
+          signal,
+          transport,
+        );
+      }
+
       return fail(
-        message.includes('please wait') ? 'RATE_LIMITED' : 'REQUEST_BLOCKED',
+        signal === 'please_wait' ? 'RATE_LIMITED' : 'REQUEST_BLOCKED',
         'Instagram interrupted this scan. Progress was saved; wait before resuming.',
+        response.status,
+        undefined,
+        signal,
+        transport,
       );
     }
 
@@ -203,7 +281,8 @@ export async function runInstagramOperation(
 
   if (operation.kind === 'counts') {
     const response = await request(
-      `/users/${encodeURIComponent(operation.viewerId)}/info/`,
+      `${API_BASE}/users/${encodeURIComponent(operation.viewerId)}/info/`,
+      'rest',
     );
     if (!response.ok) return response;
 
@@ -224,12 +303,109 @@ export async function runInstagramOperation(
   }
 
   if (operation.kind === 'list-page') {
+    const transport = operation.transport ?? 'rest';
     const pageSize = Math.min(100, Math.max(1, Math.floor(operation.pageSize ?? 50)));
+
+    if (transport === 'graphql') {
+      const queryHash = operation.list === 'following'
+        ? FOLLOWING_QUERY_HASH
+        : FOLLOWERS_QUERY_HASH;
+      const variables: Record<string, unknown> = {
+        id: String(operation.viewerId),
+        first: pageSize,
+      };
+      if (operation.cursor) variables.after = operation.cursor;
+
+      const params = new URLSearchParams({
+        query_hash: queryHash,
+        variables: JSON.stringify(variables),
+      });
+      const response = await request(
+        `${GRAPHQL_BASE}?${params.toString()}`,
+        'graphql',
+      );
+      if (!response.ok) return response;
+
+      const root = response.data.data && typeof response.data.data === 'object'
+        ? response.data.data as Record<string, unknown>
+        : {};
+      const user = root.user && typeof root.user === 'object'
+        ? root.user as Record<string, unknown>
+        : {};
+      const edgeKey = operation.list === 'following' ? 'edge_follow' : 'edge_followed_by';
+      const edge = user[edgeKey] && typeof user[edgeKey] === 'object'
+        ? user[edgeKey] as Record<string, unknown>
+        : null;
+
+      if (!edge) {
+        return fail(
+          'INVALID_RESPONSE',
+          'Instagram GraphQL did not return a relationship list.',
+          200,
+          undefined,
+          undefined,
+          'graphql',
+        );
+      }
+
+      const rawEdges = Array.isArray(edge.edges)
+        ? edge.edges as Array<Record<string, unknown>>
+        : [];
+      const users: InstagramUserRef[] = [];
+
+      for (const rawEdge of rawEdges) {
+        const node = rawEdge.node && typeof rawEdge.node === 'object'
+          ? rawEdge.node as Record<string, unknown>
+          : {};
+        const idRaw = node.id ?? node.pk;
+        const id = idRaw == null ? '' : String(idRaw);
+        const username = normalize(node.username);
+        if (!id || !username) continue;
+        users.push({ id, username });
+      }
+
+      const pageInfo = edge.page_info && typeof edge.page_info === 'object'
+        ? edge.page_info as Record<string, unknown>
+        : {};
+      const hasNextPage = pageInfo.has_next_page === true;
+      const cursorRaw = pageInfo.end_cursor;
+      const nextCursor = cursorRaw == null ? '' : String(cursorRaw);
+      const done = !hasNextPage || !nextCursor;
+      const totalRaw = Number(edge.count);
+      const reportedTotal = Number.isFinite(totalRaw)
+        ? Math.max(0, totalRaw)
+        : null;
+
+      if (!done && users.length === 0) {
+        return fail(
+          'PAGINATION_STALLED',
+          'Instagram GraphQL returned an empty page with more pages remaining.',
+          200,
+          undefined,
+          undefined,
+          'graphql',
+        );
+      }
+
+      return {
+        ok: true,
+        kind: 'list-page',
+        durationMs: duration(),
+        users,
+        ...(nextCursor ? { nextCursor } : {}),
+        done,
+        rawCount: rawEdges.length,
+        reportedTotal,
+        transport: 'graphql',
+      };
+    }
+
     const params = new URLSearchParams({ count: String(pageSize) });
     if (operation.cursor) params.set('max_id', operation.cursor);
 
     const response = await request(
-      `/friendships/${encodeURIComponent(operation.viewerId)}/${operation.list}/?${params.toString()}`,
+      `${API_BASE}/friendships/${encodeURIComponent(operation.viewerId)}/${operation.list}/?${params.toString()}`,
+      'rest',
     );
     if (!response.ok) return response;
 
@@ -240,6 +416,10 @@ export async function runInstagramOperation(
       return fail(
         'REQUEST_BLOCKED',
         'Instagram returned an intentionally limited relationship list. Progress was saved.',
+        200,
+        undefined,
+        'limited_relationship_list',
+        'rest',
       );
     }
 
@@ -262,7 +442,14 @@ export async function runInstagramOperation(
     const done = hasMore === false || !nextCursor;
 
     if (!done && users.length === 0) {
-      return fail('PAGINATION_STALLED', 'Instagram returned an empty page with more pages remaining.');
+      return fail(
+        'PAGINATION_STALLED',
+        'Instagram returned an empty page with more pages remaining.',
+        200,
+        undefined,
+        undefined,
+        'rest',
+      );
     }
 
     return {
@@ -273,11 +460,13 @@ export async function runInstagramOperation(
       ...(nextCursor ? { nextCursor } : {}),
       done,
       rawCount: rawUsers.length,
+      transport: 'rest',
     };
   }
 
   const response = await request(
-    `/friendships/show/${encodeURIComponent(operation.targetUserId)}/`,
+    `${API_BASE}/friendships/show/${encodeURIComponent(operation.targetUserId)}/`,
+    'rest',
   );
   if (!response.ok) return response;
 
@@ -288,6 +477,10 @@ export async function runInstagramOperation(
     return fail(
       'INVALID_RESPONSE',
       'Instagram returned an incomplete relationship response.',
+      200,
+      undefined,
+      undefined,
+      'rest',
     );
   }
 

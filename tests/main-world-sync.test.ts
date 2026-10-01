@@ -81,6 +81,60 @@ describe('runInstagramOperation', () => {
     ]);
   });
 
+  it('reads relationship pages through Instagram GraphQL', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return jsonResponse({
+        data: {
+          user: {
+            edge_follow: {
+              count: 2,
+              edges: [
+                { node: { id: '1', username: 'ALICE' } },
+                { node: { id: '2', username: 'Bob' } },
+              ],
+              page_info: {
+                has_next_page: true,
+                end_cursor: 'graph-page-two',
+              },
+            },
+          },
+        },
+      });
+    }) as typeof fetch;
+
+    const result = await runInstagramOperation({
+      kind: 'list-page',
+      viewerId: '42',
+      list: 'following',
+      pageSize: 24,
+      transport: 'graphql',
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      kind: 'list-page',
+      users: [
+        { id: '1', username: 'alice' },
+        { id: '2', username: 'bob' },
+      ],
+      nextCursor: 'graph-page-two',
+      done: false,
+      rawCount: 2,
+      reportedTotal: 2,
+      transport: 'graphql',
+    });
+
+    const url = new URL(calls[0]!, 'https://www.instagram.com');
+    expect(url.pathname).toBe('/graphql/query/');
+    expect(url.searchParams.get('query_hash')).toBe('58712303d941c6855d4e888c5f0cd22f');
+    expect(JSON.parse(url.searchParams.get('variables') ?? '{}')).toEqual({
+      id: '42',
+      first: 24,
+    });
+  });
+
   it('uses the requested larger page size when the endpoint accepts it', async () => {
     const calls: string[] = [];
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
@@ -142,7 +196,34 @@ describe('runInstagramOperation', () => {
       message: 'Instagram rate-limited the scan. Progress was saved and WhoBack stopped immediately.',
       status: 429,
       retryAfterMs: 120_000,
+      transport: 'rest',
     });
+  });
+
+  it('does not invent a cooldown when 429 has no Retry-After header', async () => {
+    globalThis.fetch = vi.fn(async () => jsonResponse(
+      { status: 'fail', message: 'Please wait a few minutes before you try again.' },
+      { status: 429 },
+    )) as typeof fetch;
+
+    const result = await runInstagramOperation({
+      kind: 'list-page',
+      viewerId: '42',
+      list: 'following',
+      transport: 'graphql',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.error).toMatchObject({
+      code: 'RATE_LIMITED',
+      status: 429,
+      signal: 'please_wait',
+      transport: 'graphql',
+    });
+    expect(result.error.retryAfterMs).toBeUndefined();
+    expect(result.error.message).toContain('without a retry time');
   });
 
   it('maps a browser-level fetch failure', async () => {
