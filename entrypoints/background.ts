@@ -37,9 +37,9 @@ const ALARM = 'whoback-auto-sync';
 const INSTAGRAM_URL = 'https://www.instagram.com/';
 const MAX_LIST_PAGES = 10_000;
 const CHECKPOINT_EVERY_REQUESTS = 5;
-const DEFAULT_LIST_PAGE_SIZE = 100;
-const FALLBACK_LIST_PAGE_SIZE = 50;
-const MAX_RELATIONSHIP_CONCURRENCY = 2;
+const DEFAULT_LIST_PAGE_SIZE = 50;
+const FALLBACK_LIST_PAGE_SIZE = 24;
+const MAX_RELATIONSHIP_CONCURRENCY = 1;
 const PROGRESS_COMMIT_INTERVAL_MS = 1_000;
 
 let activeRunId: string | null = null;
@@ -238,24 +238,7 @@ async function runAdaptiveSync(
       checkpoint.followers.users.map((user) => [user.id, user] as const),
     );
 
-    if (checkpoint.followingTotal == null || checkpoint.followersTotal == null) {
-      await patchSync('planning', 6, 'Planning the lowest-request scan…');
-      const counts = await executePacedOperation(pacer, checkpoint, tabId, {
-        kind: 'counts',
-        viewerId,
-      });
-
-      if (!counts.ok) {
-        if (isHardStop(counts) || isRecoverablePause(counts)) {
-          await finishFailure(counts, checkpoint);
-          return;
-        }
-      } else if (counts.kind === 'counts') {
-        checkpoint.followingTotal = counts.followingTotal;
-        checkpoint.followersTotal = counts.followersTotal;
-        await persistCheckpoint(checkpoint);
-      }
-    }
+    await patchSync('planning', 6, 'Preparing relationship scan…');
 
     if (!checkpoint.following.done) {
       checkpoint.phase = 'following';
@@ -710,6 +693,13 @@ async function executePacedOperationIfActive(
   return result;
 }
 
+function shouldFallbackGraphql(result: InstagramOperationResult): boolean {
+  if (result.ok) return false;
+  if (result.error.code === 'INVALID_RESPONSE') return true;
+  return result.error.code === 'RELATIONSHIP_REQUEST_FAILED'
+    && [400, 404, 405, 422].includes(result.error.status ?? 0);
+}
+
 function shouldFallbackListPageSize(result: InstagramOperationResult): boolean {
   return !result.ok
     && result.error.code === 'RELATIONSHIP_REQUEST_FAILED'
@@ -727,15 +717,59 @@ async function fetchListPage(
   const requestedPageSize = checkpoint.listPageSize ?? DEFAULT_LIST_PAGE_SIZE;
   checkpoint.telemetry.requestedPageSize = requestedPageSize;
 
+  const checkpointList = list === 'following'
+    ? checkpoint.following
+    : checkpoint.followers;
+  let transport = checkpointList.transport
+    ?? (checkpointList.pages > 0 || checkpointList.cursor ? 'rest' : 'graphql');
+
+  checkpointList.transport = transport;
+  if (list === 'following') {
+    checkpoint.telemetry.followingTransport = transport;
+  } else {
+    checkpoint.telemetry.followerTransport = transport;
+  }
+
   let result = await executePacedOperation(pacer, checkpoint, tabId, {
     kind: 'list-page',
     viewerId,
     list,
     cursor,
-    pageSize: requestedPageSize,
+    pageSize: transport === 'graphql'
+      ? Math.min(24, requestedPageSize)
+      : requestedPageSize,
+    transport,
   });
 
-  if (shouldFallbackListPageSize(result) && requestedPageSize > FALLBACK_LIST_PAGE_SIZE) {
+  if (
+    transport === 'graphql'
+    && checkpointList.pages === 0
+    && !cursor
+    && shouldFallbackGraphql(result)
+  ) {
+    transport = 'rest';
+    checkpointList.transport = 'rest';
+    if (list === 'following') {
+      checkpoint.telemetry.followingTransport = 'rest';
+    } else {
+      checkpoint.telemetry.followerTransport = 'rest';
+    }
+    await persistCheckpoint(checkpoint);
+
+    result = await executePacedOperation(pacer, checkpoint, tabId, {
+      kind: 'list-page',
+      viewerId,
+      list,
+      pageSize: requestedPageSize,
+      transport: 'rest',
+    });
+  }
+
+  if (
+    checkpointList.transport === 'rest'
+    && shouldFallbackListPageSize(result)
+    && requestedPageSize > FALLBACK_LIST_PAGE_SIZE
+  ) {
     checkpoint.listPageSize = FALLBACK_LIST_PAGE_SIZE;
     checkpoint.telemetry.requestedPageSize = FALLBACK_LIST_PAGE_SIZE;
     await persistCheckpoint(checkpoint);
@@ -746,15 +780,31 @@ async function fetchListPage(
       list,
       cursor,
       pageSize: FALLBACK_LIST_PAGE_SIZE,
+      transport: 'rest',
     });
   }
 
-  if (result.ok && result.kind === 'list-page' && list === 'followers' && result.rawCount > 0) {
-    checkpoint.observedFollowerPageSize = Math.max(
-      checkpoint.observedFollowerPageSize ?? 0,
-      result.rawCount,
-    );
-    checkpoint.telemetry.observedFollowerPageSize = checkpoint.observedFollowerPageSize;
+  if (result.ok && result.kind === 'list-page') {
+    checkpointList.transport = result.transport;
+    if (list === 'following') {
+      checkpoint.telemetry.followingTransport = result.transport;
+      if (result.reportedTotal != null) {
+        checkpoint.followingTotal = result.reportedTotal;
+      }
+    } else {
+      checkpoint.telemetry.followerTransport = result.transport;
+      if (result.reportedTotal != null) {
+        checkpoint.followersTotal = result.reportedTotal;
+      }
+
+      if (result.rawCount > 0) {
+        checkpoint.observedFollowerPageSize = Math.max(
+          checkpoint.observedFollowerPageSize ?? 0,
+          result.rawCount,
+        );
+        checkpoint.telemetry.observedFollowerPageSize = checkpoint.observedFollowerPageSize;
+      }
+    }
   }
 
   return result;
@@ -827,8 +877,8 @@ async function finishFailure(
   const shouldCoolDown = result.error.code === 'RATE_LIMITED'
     || result.error.code === 'REQUEST_BLOCKED';
 
-  const cooldownUntil = shouldCoolDown
-    ? Date.now() + (result.error.retryAfterMs ?? 15 * 60 * 1000)
+  const cooldownUntil = shouldCoolDown && result.error.retryAfterMs
+    ? Date.now() + result.error.retryAfterMs
     : undefined;
 
   await setSyncError(result.error.code, result.error.message, cooldownUntil);
