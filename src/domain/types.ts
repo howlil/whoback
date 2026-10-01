@@ -1,6 +1,7 @@
 export type RelationshipView = 'not-back' | 'fans' | 'mutual';
 export type SnapshotCoverage = 'full' | 'following-only';
 export type ScanStrategy = 'full-lists' | 'verify-following';
+export type RelationshipListTransport = 'graphql' | 'rest';
 
 export interface InstagramAccount {
   username: string;
@@ -48,6 +49,7 @@ export interface ScanCheckpointList {
   cursor?: string;
   done: boolean;
   pages: number;
+  transport?: RelationshipListTransport;
 }
 
 export interface ScanTelemetry {
@@ -65,6 +67,8 @@ export interface ScanTelemetry {
   strategy?: ScanStrategy;
   requestedPageSize?: number;
   observedFollowerPageSize?: number;
+  followingTransport?: RelationshipListTransport;
+  followerTransport?: RelationshipListTransport;
 }
 
 export interface ScanCheckpoint {
