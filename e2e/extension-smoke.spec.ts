@@ -59,6 +59,50 @@ async function fulfillInstagramRoute(route: Route) {
   const url = new URL(route.request().url());
   const pathName = url.pathname;
 
+  if (pathName === '/graphql/query/') {
+    const queryHash = url.searchParams.get('query_hash');
+    let body: Record<string, unknown>;
+
+    if (queryHash === '58712303d941c6855d4e888c5f0cd22f') {
+      body = {
+        data: {
+          user: {
+            edge_follow: {
+              count: 2,
+              edges: [
+                { node: { id: '1', username: 'mutual' } },
+                { node: { id: '2', username: 'ghost' } },
+              ],
+              page_info: { has_next_page: false, end_cursor: null },
+            },
+          },
+        },
+      };
+    } else if (queryHash === '37479f2b8209594dde7facb0d904896a') {
+      body = {
+        data: {
+          user: {
+            edge_followed_by: {
+              count: 2,
+              edges: [{ node: { id: '1', username: 'mutual' } }],
+              page_info: { has_next_page: false, end_cursor: null },
+            },
+          },
+        },
+      };
+    } else {
+      await route.fulfill({ status: 400, contentType: 'application/json', body: '{}' });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+    return;
+  }
+
   if (!pathName.startsWith('/api/v1/')) {
     await route.fulfill({ status: 200, contentType: 'text/html', body: instagramFixture });
     return;
